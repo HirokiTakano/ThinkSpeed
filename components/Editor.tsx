@@ -4,7 +4,6 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import type { JSONContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import Link from '@tiptap/extension-link'
 import Youtube from '@tiptap/extension-youtube'
 import { Extension } from '@tiptap/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -27,11 +26,9 @@ const LinkToggle = Extension.create({
     return {
       'Mod-k': () => {
         const { editor } = this
-        // すでにリンクなら解除
         if (editor.isActive('link')) {
           return editor.commands.unsetLink()
         }
-        // 選択テキストがURLならリンク化
         const { from, to } = editor.state.selection
         if (from === to) return false
         const selectedText = editor.state.doc.textBetween(from, to).trim()
@@ -41,6 +38,51 @@ const LinkToggle = Extension.create({
         } catch {
           return false
         }
+      },
+    }
+  },
+})
+
+/**
+ * Tab でのインデントを無制限に深くする拡張。
+ * 標準の sinkListItem（前の兄弟アイテムへの入れ子）を先に試み、
+ * 失敗した場合（先頭アイテム）は空の兄弟アイテムを直前に挿入してから
+ * sinkListItem を再実行する。
+ */
+const DeepIndent = Extension.create({
+  name: 'deepIndent',
+  priority: 150,
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => {
+        const { editor } = this
+        // 標準の sink が成功すればそれを使う
+        if (editor.commands.sinkListItem('listItem')) return true
+
+        const { state } = editor
+        const { $from } = state.selection
+        const { schema } = state
+
+        // listItem の中にいるか探す
+        let liDepth = -1
+        for (let d = $from.depth; d > 0; d--) {
+          if ($from.node(d).type.name === 'listItem') { liDepth = d; break }
+        }
+        if (liDepth < 0) return false
+
+        const listItemType  = schema.nodes.listItem
+        const paragraphType = schema.nodes.paragraph
+        if (!listItemType || !paragraphType) return false
+
+        const liStart = $from.before(liDepth)
+
+        // 空の兄弟アイテムを直前に挿入（スキーマ上は paragraph が必要）
+        const emptyLi = listItemType.create(null, paragraphType.create())
+        editor.view.dispatch(state.tr.insert(liStart, emptyLi))
+
+        // 挿入後は現在のアイテムに前の兄弟ができるので sinkListItem が成功する
+        editor.commands.sinkListItem('listItem')
+        return true
       },
     }
   },
@@ -132,7 +174,18 @@ export default function Editor({ file, onChange }: Props) {
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        link: {
+          openOnClick: true,
+          autolink: true,
+          linkOnPaste: true,
+          HTMLAttributes: {
+            class: 'editor-link',
+            rel: 'noopener noreferrer',
+            target: '_blank',
+          },
+        },
+      }),
       // YoutubeをLinkより先に登録してペーストルールを優先させる
       Youtube.configure({
         width: 640,
@@ -141,17 +194,8 @@ export default function Editor({ file, onChange }: Props) {
         nocookie: false,
         HTMLAttributes: { class: 'youtube-embed' },
       }),
-      Link.configure({
-        openOnClick: true,
-        autolink: true,
-        linkOnPaste: true,
-        HTMLAttributes: {
-          class: 'editor-link',
-          rel: 'noopener noreferrer',
-          target: '_blank',
-        },
-      }),
       BulletListToggle,
+      DeepIndent,
       LinkToggle,
       Placeholder.configure({ placeholder: '思考を書き始めよう...' }),
     ],
@@ -159,7 +203,7 @@ export default function Editor({ file, onChange }: Props) {
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class: 'outliner-editor outline-none min-h-full px-8 py-10 max-w-2xl mx-auto',
+        class: 'outliner-editor outline-none min-h-full px-8 py-10',
       },
     },
     onUpdate({ editor }) {
