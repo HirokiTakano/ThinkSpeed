@@ -116,7 +116,7 @@ export default function Sidebar({
       </div>
 
       {/* フォルダ・ファイルツリー */}
-      <div className="flex-1 overflow-y-auto py-2">
+      <div className="flex-1 min-h-0 overflow-y-auto py-2">
         {folders.map(folder => {
           const isOpen = !closedFolders.has(folder.id)
           return (

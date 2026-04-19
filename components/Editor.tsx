@@ -186,12 +186,12 @@ export default function Editor({ file, onChange }: Props) {
           },
         },
       }),
-      // YoutubeをLinkより先に登録してペーストルールを優先させる
-      Youtube.configure({
+      // YoutubeをLinkより高い優先度(200)にしてペーストルールを優先させる
+      Youtube.extend({ priority: 200 }).configure({
         width: 640,
         height: 360,
         allowFullscreen: true,
-        nocookie: false,
+        nocookie: true,
         HTMLAttributes: { class: 'youtube-embed' },
       }),
       BulletListToggle,
