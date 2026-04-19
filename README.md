@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ThinkSpeed
 
-## Getting Started
+**思考を、速く。** — 箇条書きベースの思考整理ツール
 
-First, run the development server:
+ThinkSpeed は、仕事や勉強で「頭の中を素早く整理する」ことに特化した、超軽量なアウトライナーアプリです。
+余計な装飾ボタンや複雑な機能は一切なく、キーボードだけで思考を書き出し・構造化することを重視しています。
+
+---
+
+## 特徴
+
+- **常に箇条書きモード** — ファイルを開いた瞬間から箇条書きで書き始められる
+- **階層インデント** — `Tab` / `Shift+Tab` で思考を深掘り・整理
+- **フォルダ管理** — テーマや用途ごとにフォルダを作り、複数のノートを整理
+- **YouTube 埋め込み** — YouTube URL を貼り付けるとその場で再生できる
+- **リンク化** — URL を貼り付けてショートカットでハイパーリンクに切り替え
+- **Markdown エクスポート** — ノートの内容をワンクリックでクリップボードにコピー
+- **JSON バックアップ** — 全データを JSON で書き出し・読み込み可能
+- **ローカルファースト** — データはすべてブラウザの `localStorage` に保存。アカウント不要
+
+---
+
+## キーボードショートカット
+
+| ショートカット | 動作 |
+|-------------|------|
+| `Ctrl / Cmd` + `.` | 箇条書きトグル |
+| `Tab` | インデント（階層を深く） |
+| `Shift + Tab` | アウトデント（階層を浅く） |
+| `Ctrl / Cmd` + `K` | リンクのトグル（ON/OFF） |
+
+---
+
+## ローカルで動かす
+
+**必要なもの**: Node.js 18 以上
 
 ```bash
+# リポジトリをクローン
+git clone https://github.com/HirokiTakano/ThinkSpeed.git
+cd ThinkSpeed
+
+# 依存パッケージをインストール
+npm install
+
+# 開発サーバーを起動
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+ブラウザで [http://localhost:3000](http://localhost:3000) を開いてください。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 技術スタック
 
-## Learn More
+| 技術 | バージョン |
+|-----|-----------|
+| [Next.js](https://nextjs.org) (App Router) | 16.2.x |
+| [React](https://react.dev) | 19.x |
+| [TypeScript](https://www.typescriptlang.org) | 5.x |
+| [Tailwind CSS](https://tailwindcss.com) | v4 |
+| [Tiptap](https://tiptap.dev) | v3 |
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## デプロイ
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+このアプリは [AWS Amplify](https://aws.amazon.com/amplify/) でホスティングしています。
 
-## Deploy on Vercel
+```bash
+npm run build
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+ビルド出力は `.next/` ディレクトリに生成されます。
+Amplify のカスタムヘッダー設定は `customHttp.yml` を参照してください。
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## ライセンス
+
+MIT
+
