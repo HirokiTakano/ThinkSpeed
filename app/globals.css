@@ -24,3 +24,36 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Tiptap エディタ本体のスタイル */
+.outliner-editor {
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.outliner-editor p {
+  margin: 0.2em 0;
+}
+
+.outliner-editor ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin: 0.2em 0;
+}
+
+.outliner-editor ul ul {
+  list-style-type: circle;
+}
+
+.outliner-editor ul ul ul {
+  list-style-type: square;
+}
+
+.outliner-editor li {
+  margin: 0.1em 0;
+}
+
+/* リストアイテム内の p タグの余白をリセット */
+.outliner-editor li > p {
+  margin: 0;
+}
