@@ -1,12 +1,12 @@
 'use client'
 
 import { useEditor, EditorContent } from '@tiptap/react'
+import type { JSONContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Extension } from '@tiptap/core'
-import { useCallback, useEffect, useState } from 'react'
-
-const STORAGE_KEY = 'outliner-content'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { FileItem } from '@/hooks/useStore'
 
 // Ctrl+. / Cmd+. でBulletListをトグル
 const BulletListToggle = Extension.create({
@@ -83,19 +83,15 @@ function nodeToMarkdown(node: TiptapNode, depth = 0): string {
   }
 }
 
-function KbdHint({ keys, label }: { keys: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <kbd className="inline-flex items-center px-1.5 py-0.5 rounded border border-gray-200 bg-gray-50 text-[10px] font-mono text-gray-500 leading-none">
-        {keys}
-      </kbd>
-      <span>{label}</span>
-    </span>
-  )
+type Props = {
+  file: FileItem | null
+  onChange: (fileId: string, content: JSONContent) => void
 }
 
-export default function Editor() {
+export default function Editor({ file, onChange }: Props) {
   const [copied, setCopied] = useState(false)
+  // 現在表示中のファイルIDを追跡（ファイル切替時の誤保存防止）
+  const activeFileIdRef = useRef<string | null>(null)
 
   const editor = useEditor({
     extensions: [
@@ -103,28 +99,29 @@ export default function Editor() {
       BulletListToggle,
       Placeholder.configure({ placeholder: '思考を書き始めよう...' }),
     ],
-    content: '',
+    content: file?.content ?? '',
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class: 'outliner-editor outline-none min-h-[calc(100vh-56px)] px-8 py-10 max-w-2xl mx-auto',
+        class: 'outliner-editor outline-none min-h-full px-8 py-10 max-w-2xl mx-auto',
       },
     },
     onUpdate({ editor }) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(editor.getJSON()))
-      } catch { /* noop */ }
+      const id = activeFileIdRef.current
+      if (id) onChange(id, editor.getJSON())
     },
   })
 
-  // localStorage から復元
+  // ファイルが切り替わったらエディタの内容を差し替える
   useEffect(() => {
-    if (!editor) return
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) editor.commands.setContent(JSON.parse(saved))
-    } catch { /* noop */ }
-  }, [editor])
+    if (!editor || !file) return
+    if (activeFileIdRef.current === file.id) return
+
+    activeFileIdRef.current = file.id
+    editor.commands.setContent(file.content ?? '', { emitUpdate: false })
+    // フォーカスを先頭に
+    editor.commands.focus('start')
+  }, [editor, file])
 
   const copyMarkdown = useCallback(async () => {
     if (!editor) return
@@ -136,25 +133,25 @@ export default function Editor() {
     } catch { /* noop */ }
   }, [editor])
 
+  if (!file) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-sm text-gray-400 select-none">
+        サイドバーからファイルを選択してください
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-[#FAFAF8]">
-      {/* ヘッダー */}
-      <header className="sticky top-0 z-10 h-14 bg-white/90 backdrop-blur-sm border-b border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div className="max-w-2xl mx-auto px-8 h-full flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-indigo-500 font-bold text-base leading-none select-none">✦</span>
-            <span className="font-semibold text-gray-700 text-sm tracking-tight">ThinkSpeed</span>
-          </div>
-          <div className="hidden sm:flex items-center gap-4 text-[11px] text-gray-400">
-            <KbdHint keys="Ctrl+." label="リスト切替" />
-            <KbdHint keys="Tab" label="インデント" />
-            <KbdHint keys="Shift+Tab" label="アウトデント" />
-          </div>
-        </div>
-      </header>
+    <div className="flex-1 flex flex-col min-h-screen bg-[#FAFAF8] relative">
+      {/* ファイル名表示 */}
+      <div className="sticky top-0 z-10 h-12 bg-white/90 backdrop-blur-sm border-b border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex items-center px-8">
+        <span className="text-sm font-medium text-gray-600 truncate">{file.name}</span>
+      </div>
 
       {/* エディタ本体 */}
-      <EditorContent editor={editor} />
+      <div className="flex-1 overflow-y-auto">
+        <EditorContent editor={editor} className="h-full" />
+      </div>
 
       {/* Markdownコピーボタン */}
       <button
