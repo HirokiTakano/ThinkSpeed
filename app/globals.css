@@ -134,3 +134,58 @@ body {
 .outliner-editor em {
   color: #4b5563;
 }
+
+/* =====================
+   リンク
+   ===================== */
+.outliner-editor a.editor-link,
+.ProseMirror a.editor-link {
+  color: #4338ca;
+  background-color: rgba(99, 102, 241, 0.08);
+  text-decoration: underline;
+  text-decoration-color: #818cf8;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  border-radius: 3px;
+  padding: 0 2px;
+  cursor: pointer;
+  word-break: break-all;
+  transition: background-color 0.15s, color 0.15s;
+}
+.outliner-editor a.editor-link:hover,
+.ProseMirror a.editor-link:hover {
+  color: #3730a3;
+  background-color: rgba(99, 102, 241, 0.15);
+  text-decoration-color: #4f46e5;
+}
+
+/* =====================
+   YouTube 埋め込み
+   ===================== */
+.outliner-editor div[data-youtube-video],
+.ProseMirror div[data-youtube-video] {
+  margin: 1.25rem 0;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.10);
+  background: #000;
+  position: relative;
+  /* 16:9 アスペクト比 */
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  max-width: 640px;
+}
+.outliner-editor div[data-youtube-video] iframe,
+.ProseMirror div[data-youtube-video] iframe {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  border: none;
+}
+/* 選択状態のハイライト */
+.outliner-editor div[data-youtube-video].ProseMirror-selectednode,
+.ProseMirror div[data-youtube-video].ProseMirror-selectednode {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}

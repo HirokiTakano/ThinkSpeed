@@ -4,6 +4,8 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import type { JSONContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
+import Link from '@tiptap/extension-link'
+import Youtube from '@tiptap/extension-youtube'
 import { Extension } from '@tiptap/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FileItem } from '@/hooks/useStore'
@@ -18,11 +20,37 @@ const BulletListToggle = Extension.create({
   },
 })
 
+// Ctrl+K / Cmd+K でリンクをトグル
+const LinkToggle = Extension.create({
+  name: 'linkToggle',
+  addKeyboardShortcuts() {
+    return {
+      'Mod-k': () => {
+        const { editor } = this
+        // すでにリンクなら解除
+        if (editor.isActive('link')) {
+          return editor.commands.unsetLink()
+        }
+        // 選択テキストがURLならリンク化
+        const { from, to } = editor.state.selection
+        if (from === to) return false
+        const selectedText = editor.state.doc.textBetween(from, to).trim()
+        try {
+          const url = new URL(selectedText)
+          return editor.commands.setLink({ href: url.href, target: '_blank' })
+        } catch {
+          return false
+        }
+      },
+    }
+  },
+})
+
 type TiptapNode = {
   type: string
   text?: string
   attrs?: Record<string, unknown>
-  marks?: Array<{ type: string }>
+  marks?: Array<{ type: string; attrs?: Record<string, unknown> }>
   content?: TiptapNode[]
 }
 
@@ -71,12 +99,21 @@ function nodeToMarkdown(node: TiptapNode, depth = 0): string {
         else if (mark.type === 'italic') t = `*${t}*`
         else if (mark.type === 'code') t = `\`${t}\``
         else if (mark.type === 'strike') t = `~~${t}~~`
+        else if (mark.type === 'link') {
+          const href = (mark.attrs?.href as string) ?? ''
+          t = `[${t}](${href})`
+        }
       }
       return t
     }
 
     case 'hardBreak':
       return '\n'
+
+    case 'youtube': {
+      const src = (node.attrs?.src as string) ?? ''
+      return `[YouTube Video](${src})`
+    }
 
     default:
       return (node.content ?? []).map(c => nodeToMarkdown(c, depth)).join('')
@@ -96,7 +133,26 @@ export default function Editor({ file, onChange }: Props) {
   const editor = useEditor({
     extensions: [
       StarterKit,
+      // YoutubeをLinkより先に登録してペーストルールを優先させる
+      Youtube.configure({
+        width: 640,
+        height: 360,
+        allowFullscreen: true,
+        nocookie: false,
+        HTMLAttributes: { class: 'youtube-embed' },
+      }),
+      Link.configure({
+        openOnClick: true,
+        autolink: true,
+        linkOnPaste: true,
+        HTMLAttributes: {
+          class: 'editor-link',
+          rel: 'noopener noreferrer',
+          target: '_blank',
+        },
+      }),
       BulletListToggle,
+      LinkToggle,
       Placeholder.configure({ placeholder: '思考を書き始めよう...' }),
     ],
     content: file?.content ?? '',

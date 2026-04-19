@@ -240,7 +240,7 @@ export default function Sidebar({
 
       {/* ショートカットヒント */}
       <div className="px-4 py-3 border-t border-gray-200/80 space-y-1.5">
-        {([['Ctrl+.', 'リスト切替'], ['Tab', 'インデント'], ['Shift+Tab', 'アウトデント']] as const).map(
+        {([['Ctrl+.', 'リスト切替'], ['Tab', 'インデント'], ['Shift+Tab', 'アウトデント'], ['Ctrl+K', 'リンク切替']] as const).map(
           ([key, label]) => (
             <div key={key} className="flex items-center gap-1.5 text-[10px] text-gray-400">
               <kbd className="px-1 py-0.5 rounded border border-gray-200 bg-white font-mono text-[9px] leading-none">
