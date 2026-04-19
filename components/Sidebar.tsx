@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import type { Folder } from '@/hooks/useStore'
 
 type Props = {
@@ -13,6 +13,8 @@ type Props = {
   onRenameFile: (id: string, name: string) => void
   onDeleteFolder: (id: string) => void
   onDeleteFile: (id: string) => void
+  onExport: () => void
+  onImport: (file: File) => void
 }
 
 function InlineEdit({
@@ -56,13 +58,16 @@ export default function Sidebar({
   onRenameFile,
   onDeleteFolder,
   onDeleteFile,
+  onExport,
+  onImport,
 }: Props) {
-  // フォルダの開閉状態（新しいフォルダはデフォルト open）
   const [closedFolders, setClosedFolders] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<{
     id: string
     type: 'folder' | 'file'
   } | null>(null)
+  const [importFeedback, setImportFeedback] = useState<'idle' | 'ok' | 'err'>('idle')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const totalFiles = folders.reduce((n, f) => n + f.files.length, 0)
 
@@ -72,6 +77,20 @@ export default function Sidebar({
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
+  }
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    // reset input so same file can be re-selected
+    e.target.value = ''
+    try {
+      onImport(file)
+      setImportFeedback('ok')
+    } catch {
+      setImportFeedback('err')
+    }
+    setTimeout(() => setImportFeedback('idle'), 2000)
   }
 
   return (
@@ -236,6 +255,47 @@ export default function Sidebar({
             </div>
           )
         })}
+      </div>
+
+      {/* エクスポート / インポート */}
+      <div className="px-4 py-3 border-t border-gray-200/80 space-y-1.5">
+        {/* hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          onChange={handleImportFile}
+        />
+        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">データ管理</p>
+        <button
+          onClick={onExport}
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          JSONでエクスポート
+        </button>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] transition-colors
+            ${importFeedback === 'ok'
+              ? 'text-emerald-600 bg-emerald-50'
+              : importFeedback === 'err'
+              ? 'text-red-500 bg-red-50'
+              : 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50'
+            }`}
+        >
+          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 5 17 10" />
+            <line x1="12" y1="5" x2="12" y2="15" />
+          </svg>
+          {importFeedback === 'ok' ? 'インポート完了!' : importFeedback === 'err' ? '読み込み失敗' : 'JSONをインポート'}
+        </button>
       </div>
 
       {/* ショートカットヒント */}

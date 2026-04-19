@@ -16,6 +16,8 @@ export default function Home() {
     renameFile,
     deleteFolder,
     deleteFile,
+    exportData,
+    importData,
   } = useStore()
 
   return (
@@ -30,6 +32,8 @@ export default function Home() {
         onRenameFile={renameFile}
         onDeleteFolder={deleteFolder}
         onDeleteFile={deleteFile}
+        onExport={exportData}
+        onImport={importData}
       />
       <main className="flex-1 overflow-y-auto">
         <Editor file={activeFile} onChange={updateFileContent} />
