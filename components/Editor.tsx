@@ -250,17 +250,17 @@ export default function Editor({ file, onChange }: Props) {
 
   if (!file) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-gray-400 select-none">
+      <div className="flex-1 flex items-center justify-center text-sm text-gray-400 dark:text-zinc-500 select-none">
         サイドバーからファイルを選択してください
       </div>
     )
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-[#FAFAF8] relative">
+    <div className="flex-1 flex flex-col min-h-screen bg-[#FAFAF8] dark:bg-[#1C1C1E] relative">
       {/* ファイル名表示 */}
-      <div className="sticky top-0 z-10 h-12 bg-white/90 backdrop-blur-sm border-b border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex items-center px-8">
-        <span className="text-sm font-medium text-gray-600 truncate">{file.name}</span>
+      <div className="sticky top-0 z-10 h-12 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm border-b border-gray-100 dark:border-zinc-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex items-center px-8">
+        <span className="text-sm font-medium text-gray-600 dark:text-zinc-300 truncate">{file.name}</span>
       </div>
 
       {/* エディタ本体 */}
@@ -274,8 +274,8 @@ export default function Editor({ file, onChange }: Props) {
         aria-label="Markdownをクリップボードにコピー"
         className={`fixed bottom-6 right-6 flex items-center gap-1.5 text-xs px-4 py-2 rounded-full border shadow-md transition-all duration-200 select-none cursor-pointer
           ${copied
-            ? 'bg-indigo-500 border-indigo-400 text-white shadow-indigo-100'
-            : 'bg-white border-gray-200 text-gray-500 hover:text-gray-800 hover:border-gray-300 hover:shadow-lg'
+            ? 'bg-indigo-500 border-indigo-400 text-white shadow-indigo-100 dark:shadow-indigo-900'
+            : 'bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-500 dark:text-zinc-400 hover:text-gray-800 dark:hover:text-zinc-200 hover:border-gray-300 dark:hover:border-zinc-600 hover:shadow-lg'
           }`}
       >
         {copied ? (

@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tailwind v4: dark: variants をメディアクエリではなくクラスで制御する */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -17,6 +20,15 @@
     --background: #0a0a0a;
     --foreground: #ededed;
   }
+}
+
+/* === ダークモード === */
+html.dark {
+  color-scheme: dark;
+}
+.dark {
+  --background: #1C1C1E;
+  --foreground: #e5e7eb;
 }
 
 body {
@@ -188,4 +200,64 @@ body {
 .ProseMirror div[data-youtube-video].ProseMirror-selectednode {
   outline: 2px solid #6366f1;
   outline-offset: 2px;
+}
+
+/* =====================
+   ダークモード — Tiptap エディタ
+   ===================== */
+.dark .outliner-editor {
+  color: #d1d5db;
+  caret-color: #818cf8;
+}
+
+.dark .outliner-editor p.is-editor-empty:first-child::before {
+  color: #4b5563;
+}
+
+.dark .outliner-editor h1 { color: #f9fafb; }
+.dark .outliner-editor h2 { color: #f3f4f6; }
+.dark .outliner-editor h3 { color: #e5e7eb; }
+
+.dark .outliner-editor ul > li::marker,
+.dark .ProseMirror ul > li::marker { color: #6366f1; }
+.dark .outliner-editor ul ul > li::marker,
+.dark .ProseMirror ul ul > li::marker { color: #818cf8; }
+.dark .outliner-editor ul ul ul > li::marker,
+.dark .ProseMirror ul ul ul > li::marker { color: #6b7280; }
+
+.dark .outliner-editor code {
+  background: #27272a;
+  border-color: #3f3f46;
+  color: #a5b4fc;
+}
+
+.dark .outliner-editor strong { color: #f9fafb; }
+.dark .outliner-editor em { color: #d1d5db; }
+
+.dark .outliner-editor a.editor-link,
+.dark .ProseMirror a.editor-link {
+  color: #818cf8;
+  background-color: rgba(99, 102, 241, 0.15);
+  text-decoration-color: #6366f1;
+}
+.dark .outliner-editor a.editor-link:hover,
+.dark .ProseMirror a.editor-link:hover {
+  color: #a5b4fc;
+  background-color: rgba(99, 102, 241, 0.25);
+  text-decoration-color: #818cf8;
+}
+
+.dark .outliner-editor div[data-youtube-video],
+.dark .ProseMirror div[data-youtube-video] {
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
+}
+
+
+/* 使い方オーバーレイのアニメーション */
+@keyframes helpOverlayEnter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.help-overlay-enter {
+  animation: helpOverlayEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
