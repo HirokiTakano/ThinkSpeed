@@ -11,8 +11,13 @@ type Store = { folders: Folder[]; activeFileId: string | null }
 const STORE_KEY = 'outliner-store-v2'
 const LEGACY_KEY = 'outliner-content'
 
+const EMPTY_BULLET_CONTENT: JSONContent = {
+  type: 'doc',
+  content: [{ type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph' }] }] }],
+}
+
 function newFile(name = '無題のノート'): FileItem {
-  return { id: crypto.randomUUID(), name, content: { type: 'doc', content: [] } }
+  return { id: crypto.randomUUID(), name, content: EMPTY_BULLET_CONTENT }
 }
 
 function newFolder(name = '新しいフォルダ'): Folder {

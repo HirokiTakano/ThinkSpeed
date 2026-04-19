@@ -9,6 +9,20 @@ import { Extension } from '@tiptap/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FileItem } from '@/hooks/useStore'
 
+// 空のドキュメントかどうか判定するヘルパー
+const EMPTY_BULLET: JSONContent = {
+  type: 'doc',
+  content: [{ type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph' }] }] }],
+}
+
+function isEmptyDoc(content: JSONContent | null | undefined): boolean {
+  if (!content) return true
+  const nodes = content.content ?? []
+  if (nodes.length === 0) return true
+  if (nodes.length === 1 && nodes[0].type === 'paragraph' && !(nodes[0].content?.length)) return true
+  return false
+}
+
 // Ctrl+. / Cmd+. でBulletListをトグル
 const BulletListToggle = Extension.create({
   name: 'bulletListToggle',
@@ -199,7 +213,7 @@ export default function Editor({ file, onChange }: Props) {
       LinkToggle,
       Placeholder.configure({ placeholder: '思考を書き始めよう...' }),
     ],
-    content: file?.content ?? '',
+    content: isEmptyDoc(file?.content) ? EMPTY_BULLET : (file?.content ?? EMPTY_BULLET),
     immediatelyRender: false,
     editorProps: {
       attributes: {
@@ -218,7 +232,8 @@ export default function Editor({ file, onChange }: Props) {
     if (activeFileIdRef.current === file.id) return
 
     activeFileIdRef.current = file.id
-    editor.commands.setContent(file.content ?? '', { emitUpdate: false })
+    const contentToSet = isEmptyDoc(file.content) ? EMPTY_BULLET : file.content
+    editor.commands.setContent(contentToSet, { emitUpdate: false })
     // フォーカスを先頭に
     editor.commands.focus('start')
   }, [editor, file])
