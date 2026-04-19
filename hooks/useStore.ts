@@ -50,7 +50,7 @@ function loadFromStorage(): Store {
 }
 
 export function useStore() {
-  const [store, setStore] = useState<Store>(defaultStore)
+  const [store, setStore] = useState<Store>({ folders: [], activeFileId: null })
   const hydrated = useRef(false)
 
   // Load from localStorage on mount (client only)
