@@ -150,6 +150,43 @@ export function useStore() {
     })
   }, [])
 
+  const exportData = useCallback(() => {
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      folders: store.folders,
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `thinkspeed-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [store.folders])
+
+  const importData = useCallback((file: File) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const json = JSON.parse(e.target?.result as string)
+        // version 1 ラッパーと生の folders 配列の両方に対応
+        const folders: Folder[] = Array.isArray(json) ? json : json.folders
+        if (!Array.isArray(folders) || folders.length === 0) throw new Error('Invalid')
+        // 最低限のバリデーション
+        for (const f of folders) {
+          if (typeof f.id !== 'string' || !Array.isArray(f.files)) throw new Error('Invalid')
+        }
+        const allFiles = folders.flatMap(f => f.files)
+        const activeFileId = allFiles[0]?.id ?? null
+        setStore({ folders, activeFileId })
+      } catch {
+        alert('JSONファイルの読み込みに失敗しました。\nThinkSpeed の正しいバックアップファイルか確認してください。')
+      }
+    }
+    reader.readAsText(file)
+  }, [])
+
   return {
     store,
     activeFile,
@@ -161,5 +198,7 @@ export function useStore() {
     renameFile,
     deleteFolder,
     deleteFile,
+    exportData,
+    importData,
   }
 }
