@@ -48,12 +48,11 @@ export default function Home() {
   }, [])
 
   const toggleTheme = () => {
-    setTheme(t => {
-      const next = t === 'light' ? 'dark' : 'light'
-      document.documentElement.classList.toggle('dark', next === 'dark')
-      localStorage.setItem(THEME_KEY, next)
-      return next
-    })
+    const next: 'light' | 'dark' = theme === 'light' ? 'dark' : 'light'
+    document.documentElement.classList.toggle('dark', next === 'dark')
+    localStorage.setItem(THEME_KEY, next)
+    setTheme(next)
+    applyColorsToDOM(lightColors, darkColors)
   }
 
   const changeColor = (mode: 'light' | 'dark', key: keyof ColorConfig, value: string) => {
