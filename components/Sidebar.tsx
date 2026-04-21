@@ -473,7 +473,8 @@ export default function Sidebar({
                 </button>
                 {/* フォルダアイコン */}
                 <svg
-                  className="w-3.5 h-3.5 shrink-0 text-indigo-400"
+                  className="w-3.5 h-3.5 shrink-0"
+                  style={{ color: 'var(--ts-marker)' }}
                   viewBox="0 0 24 24"
                   fill="currentColor"
                 >
