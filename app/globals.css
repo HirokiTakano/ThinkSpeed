@@ -31,8 +31,50 @@ html.dark {
   --foreground: #e5e7eb;
 }
 
+/* =====================
+   カラーテーマ CSS 変数
+   JS から style.setProperty() で --ts-light-* / --ts-dark-* を上書き可能。
+   エイリアス変数 (--ts-bg-main etc.) が html.dark で自動切替される。
+   サイドバー背景は color-mix() で自動導出される。
+   ===================== */
+
+html {
+  /* ライトモード デフォルト値（JS から上書き可能） */
+  --ts-light-bg-main:    #FAFAF8;
+  --ts-light-text-color: #374151;
+  --ts-light-accent:     #6366f1;
+  --ts-light-marker:     #818cf8;
+
+  /* ダークモード デフォルト値（JS から上書き可能） */
+  --ts-dark-bg-main:    #1C1C1E;
+  --ts-dark-text-color: #d1d5db;
+  --ts-dark-accent:     #818cf8;
+  --ts-dark-marker:     #6366f1;
+
+  /* アクティブ エイリアス（ライトモード時） */
+  --ts-bg-main:    var(--ts-light-bg-main);
+  --ts-bg-sidebar: color-mix(in srgb, var(--ts-light-bg-main) 94%, black);
+  --ts-text-color: var(--ts-light-text-color);
+  --ts-accent:     var(--ts-light-accent);
+  --ts-marker:     var(--ts-light-marker);
+}
+
+/* ダークモード時はダーク変数に切替 */
+html.dark {
+  --ts-bg-main:    var(--ts-dark-bg-main);
+  --ts-bg-sidebar: color-mix(in srgb, var(--ts-dark-bg-main) 68%, black);
+  --ts-text-color: var(--ts-dark-text-color);
+  --ts-accent:     var(--ts-dark-accent);
+  --ts-marker:     var(--ts-dark-marker);
+}
+
+/* backdrop-blur 付きヘッダー用（透明度付き背景） */
+.ts-bg-main-alpha {
+  background-color: color-mix(in srgb, var(--ts-bg-main) 95%, transparent);
+}
+
 body {
-  background: var(--background);
+  background: var(--ts-bg-main);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
@@ -43,15 +85,15 @@ body {
 .outliner-editor {
   font-size: 1rem;
   line-height: 1.85;
-  color: #374151;
-  caret-color: #6366f1;
+  color: var(--ts-text-color);
+  caret-color: var(--ts-accent);
   overflow: visible;
 }
 
 /* プレースホルダー */
 .outliner-editor p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: #d1d5db;
+  color: color-mix(in srgb, var(--ts-text-color) 30%, transparent);
   pointer-events: none;
   float: left;
   height: 0;
@@ -66,7 +108,7 @@ body {
 .outliner-editor h1 {
   font-size: 1.65rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--ts-text-color);
   letter-spacing: -0.025em;
   line-height: 1.3;
   margin: 1.4em 0 0.4em;
@@ -74,7 +116,7 @@ body {
 .outliner-editor h2 {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--ts-text-color);
   letter-spacing: -0.015em;
   line-height: 1.4;
   margin: 1.1em 0 0.3em;
@@ -82,7 +124,7 @@ body {
 .outliner-editor h3 {
   font-size: 1.05rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--ts-text-color);
   margin: 0.9em 0 0.2em;
 }
 
@@ -116,15 +158,15 @@ body {
 /* マーカーの色 */
 .outliner-editor ul > li::marker,
 .ProseMirror ul > li::marker {
-  color: #818cf8;
+  color: var(--ts-marker);
 }
 .outliner-editor ul ul > li::marker,
 .ProseMirror ul ul > li::marker {
-  color: #a78bfa;
+  color: color-mix(in srgb, var(--ts-marker) 70%, var(--ts-bg-main));
 }
 .outliner-editor ul ul ul > li::marker,
 .ProseMirror ul ul ul > li::marker {
-  color: #9ca3af;
+  color: color-mix(in srgb, var(--ts-marker) 45%, var(--ts-bg-main));
 }
 
 /* インラインコード */
@@ -135,16 +177,15 @@ body {
   border: 1px solid #e5e7eb;
   border-radius: 4px;
   padding: 0.1em 0.4em;
-  color: #6366f1;
+  color: var(--ts-accent);
 }
 
 /* 太字 / 斜体 */
 .outliner-editor strong {
   font-weight: 600;
-  color: #111827;
 }
 .outliner-editor em {
-  color: #4b5563;
+  color: color-mix(in srgb, var(--ts-text-color) 70%, var(--ts-bg-main));
 }
 
 /* =====================
@@ -152,10 +193,10 @@ body {
    ===================== */
 .outliner-editor a.editor-link,
 .ProseMirror a.editor-link {
-  color: #4338ca;
-  background-color: rgba(99, 102, 241, 0.08);
+  color: var(--ts-accent);
+  background-color: color-mix(in srgb, var(--ts-accent) 10%, var(--ts-bg-main));
   text-decoration: underline;
-  text-decoration-color: #818cf8;
+  text-decoration-color: color-mix(in srgb, var(--ts-accent) 60%, transparent);
   text-decoration-thickness: 1.5px;
   text-underline-offset: 3px;
   border-radius: 3px;
@@ -166,9 +207,8 @@ body {
 }
 .outliner-editor a.editor-link:hover,
 .ProseMirror a.editor-link:hover {
-  color: #3730a3;
-  background-color: rgba(99, 102, 241, 0.15);
-  text-decoration-color: #4f46e5;
+  background-color: color-mix(in srgb, var(--ts-accent) 18%, var(--ts-bg-main));
+  text-decoration-color: var(--ts-accent);
 }
 
 /* =====================
@@ -198,53 +238,14 @@ body {
 /* 選択状態のハイライト */
 .outliner-editor div[data-youtube-video].ProseMirror-selectednode,
 .ProseMirror div[data-youtube-video].ProseMirror-selectednode {
-  outline: 2px solid #6366f1;
+  outline: 2px solid var(--ts-accent);
   outline-offset: 2px;
 }
 
-/* =====================
-   ダークモード — Tiptap エディタ
-   ===================== */
-.dark .outliner-editor {
-  color: #d1d5db;
-  caret-color: #818cf8;
-}
-
-.dark .outliner-editor p.is-editor-empty:first-child::before {
-  color: #4b5563;
-}
-
-.dark .outliner-editor h1 { color: #f9fafb; }
-.dark .outliner-editor h2 { color: #f3f4f6; }
-.dark .outliner-editor h3 { color: #e5e7eb; }
-
-.dark .outliner-editor ul > li::marker,
-.dark .ProseMirror ul > li::marker { color: #6366f1; }
-.dark .outliner-editor ul ul > li::marker,
-.dark .ProseMirror ul ul > li::marker { color: #818cf8; }
-.dark .outliner-editor ul ul ul > li::marker,
-.dark .ProseMirror ul ul ul > li::marker { color: #6b7280; }
-
+/* ダークモード固有: コード背景のみ維持 */
 .dark .outliner-editor code {
   background: #27272a;
   border-color: #3f3f46;
-  color: #a5b4fc;
-}
-
-.dark .outliner-editor strong { color: #f9fafb; }
-.dark .outliner-editor em { color: #d1d5db; }
-
-.dark .outliner-editor a.editor-link,
-.dark .ProseMirror a.editor-link {
-  color: #818cf8;
-  background-color: rgba(99, 102, 241, 0.15);
-  text-decoration-color: #6366f1;
-}
-.dark .outliner-editor a.editor-link:hover,
-.dark .ProseMirror a.editor-link:hover {
-  color: #a5b4fc;
-  background-color: rgba(99, 102, 241, 0.25);
-  text-decoration-color: #818cf8;
 }
 
 .dark .outliner-editor div[data-youtube-video],
