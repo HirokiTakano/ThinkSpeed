@@ -8,6 +8,10 @@ import {
   ACCENT_SWATCHES, MARKER_SWATCHES,
   type ColorConfig,
 } from '@/hooks/themes'
+import {
+  DEFAULT_SHORTCUTS, defsConflict, formatShortcutDef,
+  type ShortcutConfig, type ShortcutDef, type Modifier,
+} from '@/hooks/shortcuts'
 
 type Props = {
   folders: Folder[]
@@ -26,6 +30,8 @@ type Props = {
   lightColors: ColorConfig
   darkColors: ColorConfig
   onChangeColor: (mode: 'light' | 'dark', key: keyof ColorConfig, value: string) => void
+  shortcuts: ShortcutConfig
+  onChangeShortcut: (action: keyof ShortcutConfig, def: ShortcutDef) => void
 }
 
 function InlineEdit({
@@ -60,12 +66,90 @@ function InlineEdit({
 }
 
 
-function HelpOverlay({ onClose }: { onClose: () => void }) {
+type RecordingTarget = keyof ShortcutConfig | null
+
+function HelpOverlay({
+  shortcuts,
+  onChangeShortcut,
+  onClose,
+}: {
+  shortcuts: ShortcutConfig
+  onChangeShortcut: (action: keyof ShortcutConfig, def: ShortcutDef) => void
+  onClose: () => void
+}) {
+  const [recording, setRecording] = useState<RecordingTarget>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  // Esc でオーバーレイを閉じる（録音中は中断のみ）
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (recording) { setRecording(null); setError(null) }
+        else onClose()
+      }
+    }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [onClose])
+  }, [onClose, recording])
+
+  // キー録音ハンドラ（capture フェーズ: エディタより先に受け取る）
+  useEffect(() => {
+    if (!recording) return
+    const handler = (e: KeyboardEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+
+      // 修飾キー単体は無視
+      if (['Control', 'Meta', 'Shift', 'Alt', 'CapsLock'].includes(e.key)) return
+      // IME 変換中は無視
+      if (e.isComposing) return
+
+      const normalKey = e.key.length === 1 ? e.key.toLowerCase() : e.key
+
+      // Tab / Shift+Tab は予約済み
+      if (normalKey === 'Tab') {
+        setError('Tab / Shift+Tab はシステムで予約されています')
+        return
+      }
+
+      // 修飾キーが1つも押されていない場合は拒否
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        setError('Ctrl（Mac: Cmd）などの修飾キーを組み合わせてください')
+        return
+      }
+
+      const modifiers: Modifier[] = []
+      if (e.ctrlKey || e.metaKey) modifiers.push('Mod')
+      if (e.shiftKey) modifiers.push('Shift')
+      if (e.altKey)  modifiers.push('Alt')
+
+      const newDef: ShortcutDef = { modifiers, key: normalKey }
+
+      // 他のショートカットと競合していないか確認
+      const otherActions = (Object.keys(shortcuts) as Array<keyof ShortcutConfig>).filter(k => k !== recording)
+      const conflict = otherActions.find(k => defsConflict(shortcuts[k], newDef))
+      if (conflict) {
+        const labels: Record<keyof ShortcutConfig, string> = { bulletList: '箇条書きトグル', link: 'リンク設定' }
+        setError(`「${labels[conflict]}」と競合しています`)
+        return
+      }
+
+      onChangeShortcut(recording, newDef)
+      setRecording(null)
+      setError(null)
+    }
+    document.addEventListener('keydown', handler, { capture: true })
+    return () => document.removeEventListener('keydown', handler, { capture: true })
+  }, [recording, shortcuts, onChangeShortcut])
+
+  const SHORTCUT_ROWS: { action: keyof ShortcutConfig; label: string; fixed?: boolean }[] = [
+    { action: 'bulletList', label: '箇条書きのオン / オフ' },
+    { action: 'link',       label: 'リンクの設定 / 解除' },
+  ]
+  const FIXED_ROWS = [
+    { key: 'Tab',       label: '一段深くインデント' },
+    { key: 'Shift+Tab', label: '一段浅くアウトデント' },
+  ]
 
   return (
     <div className="fixed inset-0 z-50 bg-[var(--ts-bg-main)] overflow-y-auto help-overlay-enter">
@@ -136,7 +220,6 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
             {([
               ["箇条書きがデフォルト", "ファイルを開いたらすぐ箇条書きで書き始められます"],
               ["YouTube 動画の埋め込み", "YouTube の URL をそのままペーストすると動画が挿入されます"],
-              ["リンクの設定", "テキストを選択して Ctrl+K（Mac: Cmd+K）でリンクを設定・解除"],
               ["Markdown でコピー", "右下の丸ボタンで内容を Markdown 形式でクリップボードにコピー"],
             ] as const).map(([title, desc]) => (
               <div key={title} className="px-4 py-3">
@@ -147,26 +230,75 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
           </div>
         </section>
 
-        {/* ショートカット */}
+        {/* キーボードショートカット */}
         <section className="space-y-3">
-          <h3 className="text-[10px] font-bold text-gray-400 dark:text-zinc-600 uppercase tracking-widest">キーボードショートカット</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-[10px] font-bold text-gray-400 dark:text-zinc-600 uppercase tracking-widest">キーボードショートカット</h3>
+            <button
+              onClick={() => {
+                onChangeShortcut('bulletList', DEFAULT_SHORTCUTS.bulletList)
+                onChangeShortcut('link', DEFAULT_SHORTCUTS.link)
+              }}
+              className="text-[10px] text-gray-400 hover:text-indigo-500 dark:text-zinc-600 dark:hover:text-indigo-400 transition-colors"
+            >
+              デフォルトに戻す
+            </button>
+          </div>
+
+          {recording && (
+            <div className="px-4 py-3 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-600 dark:text-indigo-300 text-center animate-pulse">
+              キーを押してください… (Esc でキャンセル)
+            </div>
+          )}
+          {error && !recording && (
+            <div className="px-4 py-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-xs text-red-600 dark:text-red-300 text-center">
+              {error}
+            </div>
+          )}
+
           <div className="rounded-lg bg-white dark:bg-zinc-800/50 border border-gray-100 dark:border-zinc-700/50 overflow-hidden divide-y divide-gray-100 dark:divide-zinc-700/50">
-            {([
-              ["Ctrl + .", "箇条書きのオン / オフ"],
-              ["Tab", "一段深くインデント"],
-              ["Shift + Tab", "一段浅くアウトデント"],
-              ["Ctrl + K", "リンクの設定 / 解除"],
-            ] as const).map(([key, desc]) => (
-              <div key={key} className="flex items-center gap-3 px-4 py-3">
-                <kbd className="px-2 py-1 rounded border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 font-mono text-[10px] text-gray-600 dark:text-zinc-300 shrink-0 min-w-[90px] text-center leading-none">
+            {/* カスタマイズ可能なショートカット */}
+            {SHORTCUT_ROWS.map(({ action, label }) => {
+              const isRec = recording === action
+              return (
+                <div key={action} className="flex items-center gap-3 px-4 py-3">
+                  <kbd className={`px-2 py-1 rounded border font-mono text-[10px] shrink-0 min-w-[100px] text-center leading-none transition-colors ${
+                    isRec
+                      ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 animate-pulse'
+                      : 'border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 text-gray-600 dark:text-zinc-300'
+                  }`}>
+                    {isRec ? '…' : formatShortcutDef(shortcuts[action])}
+                  </kbd>
+                  <span className="text-xs text-gray-500 dark:text-zinc-400 flex-1">{label}</span>
+                  <button
+                    onClick={() => {
+                      setError(null)
+                      setRecording(isRec ? null : action)
+                    }}
+                    className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                      isRec
+                        ? 'border-indigo-400 text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40'
+                        : 'border-gray-200 dark:border-zinc-700 text-gray-400 dark:text-zinc-500 hover:border-indigo-300 hover:text-indigo-500 dark:hover:text-indigo-400'
+                    }`}
+                  >
+                    {isRec ? 'キャンセル' : '変更'}
+                  </button>
+                </div>
+              )
+            })}
+            {/* 固定ショートカット */}
+            {FIXED_ROWS.map(({ key, label }) => (
+              <div key={key} className="flex items-center gap-3 px-4 py-3 opacity-60">
+                <kbd className="px-2 py-1 rounded border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 font-mono text-[10px] text-gray-600 dark:text-zinc-300 shrink-0 min-w-[100px] text-center leading-none">
                   {key}
                 </kbd>
-                <span className="text-xs text-gray-500 dark:text-zinc-400">{desc}</span>
+                <span className="text-xs text-gray-500 dark:text-zinc-400 flex-1">{label}</span>
+                <span className="text-[10px] text-gray-300 dark:text-zinc-700">固定</span>
               </div>
             ))}
           </div>
           <p className="text-[10px] text-gray-400 dark:text-zinc-600 text-center">
-            Mac の場合は Ctrl → Cmd に読み替えてください
+            Mac の場合、Ctrl は Cmd として表示されます
           </p>
         </section>
 
@@ -361,6 +493,8 @@ export default function Sidebar({
   lightColors,
   darkColors,
   onChangeColor,
+  shortcuts,
+  onChangeShortcut,
 }: Props) {
   const [closedFolders, setClosedFolders] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<{
@@ -671,7 +805,13 @@ export default function Sidebar({
         </button>
       </div>
     </aside>
-    {showHelp && <HelpOverlay onClose={() => setShowHelp(false)} />}
+    {showHelp && (
+      <HelpOverlay
+        shortcuts={shortcuts}
+        onChangeShortcut={onChangeShortcut}
+        onClose={() => setShowHelp(false)}
+      />
+    )}
     {showAppearance && (
       <AppearanceOverlay
         theme={theme}
