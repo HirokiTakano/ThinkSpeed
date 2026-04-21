@@ -257,7 +257,7 @@ export default function Editor({ file, onChange }: Props) {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-[#FAFAF8] dark:bg-[#1C1C1E] relative">
+    <div className="flex-1 flex flex-col min-h-screen bg-[var(--ts-bg-main)] relative">
       {/* ファイル名表示 */}
       <div className="sticky top-0 z-10 h-12 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm border-b border-gray-100 dark:border-zinc-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex items-center px-8">
         <span className="text-sm font-medium text-gray-600 dark:text-zinc-300 truncate">{file.name}</span>
