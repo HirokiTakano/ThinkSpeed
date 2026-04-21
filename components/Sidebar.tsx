@@ -2,6 +2,12 @@
 
 import { useRef, useState, useEffect } from 'react'
 import type { Folder } from '@/hooks/useStore'
+import {
+  BG_LIGHT_SWATCHES, BG_DARK_SWATCHES,
+  TEXT_LIGHT_SWATCHES, TEXT_DARK_SWATCHES,
+  ACCENT_SWATCHES, MARKER_SWATCHES,
+  type ColorConfig,
+} from '@/hooks/themes'
 
 type Props = {
   folders: Folder[]
@@ -17,6 +23,9 @@ type Props = {
   onImport: (file: File) => void
   theme: 'light' | 'dark'
   onToggleTheme: () => void
+  lightColors: ColorConfig
+  darkColors: ColorConfig
+  onChangeColor: (mode: 'light' | 'dark', key: keyof ColorConfig, value: string) => void
 }
 
 function InlineEdit({
@@ -59,10 +68,10 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#FAFAF8] dark:bg-[#1C1C1E] overflow-y-auto help-overlay-enter">
+    <div className="fixed inset-0 z-50 bg-[var(--ts-bg-main)] overflow-y-auto help-overlay-enter">
 
       {/* ヘッダー */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-[#FAFAF8]/95 dark:bg-[#1C1C1E]/95 backdrop-blur-md border-b border-gray-200 dark:border-zinc-800">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 ts-bg-main-alpha backdrop-blur-md border-b border-gray-200 dark:border-zinc-800">
         <button
           onClick={onClose}
           className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-zinc-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors"
@@ -184,6 +193,151 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
   )
 }
 
+function AppearanceOverlay({
+  theme,
+  lightColors,
+  darkColors,
+  onChangeColor,
+  onClose,
+}: {
+  theme: 'light' | 'dark'
+  lightColors: ColorConfig
+  darkColors: ColorConfig
+  onChangeColor: (mode: 'light' | 'dark', key: keyof ColorConfig, value: string) => void
+  onClose: () => void
+}) {
+  // 現在のライト/ダークモードに応じて編集対象モードを固定
+  const mode = theme
+  const activeColors = mode === 'light' ? lightColors : darkColors
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  const sections: { key: keyof ColorConfig; label: string; swatches: string[] }[] = [
+    { key: 'bg',     label: '背景色',           swatches: mode === 'light' ? BG_LIGHT_SWATCHES : BG_DARK_SWATCHES },
+    { key: 'text',   label: '文字色',           swatches: mode === 'light' ? TEXT_LIGHT_SWATCHES : TEXT_DARK_SWATCHES },
+    { key: 'marker', label: '箇条書きマーカー色', swatches: MARKER_SWATCHES },
+    { key: 'accent', label: 'アクセントカラー',   swatches: ACCENT_SWATCHES },
+  ]
+
+  const modeLabel = mode === 'light' ? '☀️ ライトモード' : '🌙 ダークモード'
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[var(--ts-bg-main)] overflow-y-auto help-overlay-enter">
+
+      {/* ヘッダー */}
+      <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 ts-bg-main-alpha backdrop-blur-md border-b border-gray-200 dark:border-zinc-800">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-zinc-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          戻る
+        </button>
+        <div className="flex items-center gap-1.5">
+          <span className="text-indigo-500">✦</span>
+          <span className="text-sm font-semibold text-gray-700 dark:text-zinc-200">外観 — {modeLabel}</span>
+        </div>
+        <div className="w-20" />
+      </header>
+
+      {/* コンテンツ */}
+      <div className="max-w-xl mx-auto px-6 py-8 space-y-8">
+
+        {/* プレビューカード */}
+        <div
+          className="rounded-xl border border-black/10 dark:border-white/10 p-5 space-y-3 transition-colors"
+          style={{ backgroundColor: activeColors.bg }}
+        >
+          <p className="text-[10px] font-bold uppercase tracking-widest mb-3"
+             style={{ color: activeColors.accent }}>
+            プレビュー
+          </p>
+          <p className="text-sm font-semibold mb-2" style={{ color: activeColors.text }}>
+            思考を素早く整理する
+          </p>
+          <ul className="space-y-1.5 pl-1">
+            {[
+              'アイデアをすぐにメモできる',
+              'タスクを箇条書きで管理する',
+              'ノートを構造化して整理する',
+            ].map((item, i) => (
+              <li key={i} className="flex items-center gap-2 text-sm">
+                <span style={{ color: i === 0 ? activeColors.marker : `${activeColors.marker}99` }}>●</span>
+                <span style={{ color: activeColors.text }}>{item}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs mt-2 underline underline-offset-2" style={{ color: activeColors.accent }}>
+            リンクのアクセントカラー
+          </p>
+        </div>
+
+        {/* 各カラーセクション */}
+        {sections.map(({ key, label, swatches }) => {
+          const currentValue = activeColors[key] ?? ''
+          return (
+          <section key={key} className="space-y-3">
+            <h3 className="text-[10px] font-bold text-gray-400 dark:text-zinc-600 uppercase tracking-widest">
+              {label}
+            </h3>
+            <div className="grid grid-cols-5 gap-2.5">
+              {swatches.map(color => {
+                const isSelected = currentValue.toLowerCase() === color.toLowerCase()
+                return (
+                  <button
+                    key={color}
+                    title={color}
+                    onClick={() => onChangeColor(mode, key, color)}
+                    style={{ backgroundColor: color }}
+                    className={`relative w-full aspect-square rounded-lg transition-all hover:scale-105 ${
+                      isSelected
+                        ? 'ring-2 ring-offset-2 ring-indigo-500 dark:ring-indigo-400 scale-105'
+                        : 'ring-1 ring-black/10 dark:ring-white/10'
+                    }`}
+                  >
+                    {isSelected && (
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <svg className="w-4 h-4 drop-shadow" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            {/* カスタムカラーピッカー */}
+            {currentValue && (
+            <div className="flex items-center gap-2.5 pt-0.5">
+              <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-gray-400 dark:text-zinc-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors">
+                <input
+                  type="color"
+                  value={currentValue}
+                  onChange={e => onChangeColor(mode, key, e.target.value)}
+                  className="w-5 h-5 cursor-pointer rounded border border-gray-300 dark:border-zinc-600 p-0"
+                />
+                その他の色
+              </label>
+              <span className="text-[10px] font-mono text-gray-300 dark:text-zinc-600">
+                {currentValue}
+              </span>
+            </div>
+            )}
+          </section>
+          )
+        })}
+
+      </div>
+    </div>
+  )
+}
+
 export default function Sidebar({
   folders,
   activeFileId,
@@ -198,6 +352,9 @@ export default function Sidebar({
   onImport,
   theme,
   onToggleTheme,
+  lightColors,
+  darkColors,
+  onChangeColor,
 }: Props) {
   const [closedFolders, setClosedFolders] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<{
@@ -206,6 +363,7 @@ export default function Sidebar({
   } | null>(null)
   const [importFeedback, setImportFeedback] = useState<'idle' | 'ok' | 'err'>('idle')
   const [showHelp, setShowHelp] = useState(false)
+  const [showAppearance, setShowAppearance] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const totalFiles = folders.reduce((n, f) => n + f.files.length, 0)
@@ -234,7 +392,7 @@ export default function Sidebar({
 
   return (
     <>
-      <aside className="w-60 shrink-0 flex flex-col h-screen bg-[#F5F4F1] dark:bg-[#111113] border-r border-gray-200 dark:border-zinc-800 overflow-hidden">
+      <aside className="w-60 shrink-0 flex flex-col h-screen bg-[var(--ts-bg-sidebar)] border-r border-gray-200 dark:border-zinc-800 overflow-hidden">
       {/* ヘッダー */}
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-200/80 dark:border-zinc-800/80">
         <span className="flex items-center gap-1.5 font-semibold text-gray-700 dark:text-zinc-200 text-sm select-none">
@@ -467,6 +625,25 @@ export default function Sidebar({
         </button>
       </div>
 
+      {/* 外観 */}
+      <div className="border-t border-gray-200/80 dark:border-zinc-800/80">
+        <button
+          onClick={() => setShowAppearance(true)}
+          className="w-full flex items-center justify-between px-4 py-2.5 text-[10px] font-medium text-gray-400 dark:text-zinc-600 uppercase tracking-wide hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors group"
+        >
+          <span className="flex items-center gap-1.5">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.1 0 2-.9 2-2 0-.52-.2-1-.52-1.36-.28-.34-.44-.78-.44-1.22 0-1.1.9-2 2-2h2.32c2.98 0 5.43-2.46 5.43-5.43C22.8 6.01 17.89 2 12 2z" />
+            </svg>
+            外観
+          </span>
+          <svg className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      </div>
+
       {/* 使い方 */}
       <div className="border-t border-gray-200/80 dark:border-zinc-800/80">
         <button
@@ -488,6 +665,15 @@ export default function Sidebar({
       </div>
     </aside>
     {showHelp && <HelpOverlay onClose={() => setShowHelp(false)} />}
+    {showAppearance && (
+      <AppearanceOverlay
+        theme={theme}
+        lightColors={lightColors}
+        darkColors={darkColors}
+        onChangeColor={onChangeColor}
+        onClose={() => setShowAppearance(false)}
+      />
+    )}
     </>
   )
 }
