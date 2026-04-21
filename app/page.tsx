@@ -9,6 +9,10 @@ import {
   applyColorsToDOM, loadColorsFromStorage,
   type ColorConfig,
 } from '@/hooks/themes'
+import {
+  DEFAULT_SHORTCUTS, SHORTCUTS_KEY, loadShortcutsFromStorage,
+  type ShortcutConfig, type ShortcutDef,
+} from '@/hooks/shortcuts'
 import { useState, useEffect } from 'react'
 
 const THEME_KEY = 'thinkspeed-theme'
@@ -32,8 +36,9 @@ export default function Home() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [lightColors, setLightColors] = useState<ColorConfig>(DEFAULT_LIGHT_COLORS)
   const [darkColors, setDarkColors] = useState<ColorConfig>(DEFAULT_DARK_COLORS)
+  const [shortcuts, setShortcuts] = useState<ShortcutConfig>(DEFAULT_SHORTCUTS)
 
-  // マウント時に保存済みテーマ・カラーを読み込んで適用
+  // マウント時に保存済みテーマ・カラー・ショートカットを読み込んで適用
   useEffect(() => {
     const saved = localStorage.getItem(THEME_KEY)
     const t: 'light' | 'dark' = saved === 'dark' ? 'dark' : 'light'
@@ -42,6 +47,7 @@ export default function Home() {
     setTheme(t)
     setLightColors(light)
     setDarkColors(dark)
+    setShortcuts(loadShortcutsFromStorage())
 
     document.documentElement.classList.toggle('dark', t === 'dark')
     applyColorsToDOM(light, dark)
@@ -73,6 +79,14 @@ export default function Home() {
     }
   }
 
+  const changeShortcut = (action: keyof ShortcutConfig, def: ShortcutDef) => {
+    setShortcuts(prev => {
+      const next: ShortcutConfig = { ...prev, [action]: def }
+      localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--ts-bg-main)]">
       <Sidebar
@@ -92,9 +106,11 @@ export default function Home() {
         lightColors={lightColors}
         darkColors={darkColors}
         onChangeColor={changeColor}
+        shortcuts={shortcuts}
+        onChangeShortcut={changeShortcut}
       />
       <main className="flex-1 overflow-y-auto">
-        <Editor file={activeFile} onChange={updateFileContent} />
+        <Editor file={activeFile} onChange={updateFileContent} shortcuts={shortcuts} />
       </main>
     </div>
   )

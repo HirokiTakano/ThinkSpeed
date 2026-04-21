@@ -2,12 +2,14 @@
 
 import { useEditor, EditorContent } from '@tiptap/react'
 import type { JSONContent } from '@tiptap/react'
+import type { Editor as TiptapEditor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Youtube from '@tiptap/extension-youtube'
 import { Extension } from '@tiptap/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FileItem } from '@/hooks/useStore'
+import { matchesEvent, type ShortcutConfig } from '@/hooks/shortcuts'
 
 // 空のドキュメントかどうか判定するヘルパー
 const EMPTY_BULLET: JSONContent = {
@@ -22,40 +24,6 @@ function isEmptyDoc(content: JSONContent | null | undefined): boolean {
   if (nodes.length === 1 && nodes[0].type === 'paragraph' && !(nodes[0].content?.length)) return true
   return false
 }
-
-// Ctrl+. / Cmd+. でBulletListをトグル
-const BulletListToggle = Extension.create({
-  name: 'bulletListToggle',
-  addKeyboardShortcuts() {
-    return {
-      'Mod-.': () => this.editor.commands.toggleBulletList(),
-    }
-  },
-})
-
-// Ctrl+K / Cmd+K でリンクをトグル
-const LinkToggle = Extension.create({
-  name: 'linkToggle',
-  addKeyboardShortcuts() {
-    return {
-      'Mod-k': () => {
-        const { editor } = this
-        if (editor.isActive('link')) {
-          return editor.commands.unsetLink()
-        }
-        const { from, to } = editor.state.selection
-        if (from === to) return false
-        const selectedText = editor.state.doc.textBetween(from, to).trim()
-        try {
-          const url = new URL(selectedText)
-          return editor.commands.setLink({ href: url.href, target: '_blank' })
-        } catch {
-          return false
-        }
-      },
-    }
-  },
-})
 
 /**
  * Tab でのインデントを無制限に深くする拡張。
@@ -179,12 +147,18 @@ function nodeToMarkdown(node: TiptapNode, depth = 0): string {
 type Props = {
   file: FileItem | null
   onChange: (fileId: string, content: JSONContent) => void
+  shortcuts: ShortcutConfig
 }
 
-export default function Editor({ file, onChange }: Props) {
+export default function Editor({ file, onChange, shortcuts }: Props) {
   const [copied, setCopied] = useState(false)
   // 現在表示中のファイルIDを追跡（ファイル切替時の誤保存防止）
   const activeFileIdRef = useRef<string | null>(null)
+  // 常に最新のショートカット設定を参照できるよう ref で保持
+  const shortcutsRef = useRef<ShortcutConfig>(shortcuts)
+  useEffect(() => { shortcutsRef.current = shortcuts }, [shortcuts])
+  // editor インスタンスへの参照（handleKeyDown 内から commands を呼ぶため）
+  const editorRef = useRef<TiptapEditor | null>(null)
 
   const editor = useEditor({
     extensions: [
@@ -208,9 +182,7 @@ export default function Editor({ file, onChange }: Props) {
         nocookie: true,
         HTMLAttributes: { class: 'youtube-embed' },
       }),
-      BulletListToggle,
       DeepIndent,
-      LinkToggle,
       Placeholder.configure({ placeholder: '思考を書き始めよう...' }),
     ],
     content: isEmptyDoc(file?.content) ? EMPTY_BULLET : (file?.content ?? EMPTY_BULLET),
@@ -219,10 +191,42 @@ export default function Editor({ file, onChange }: Props) {
       attributes: {
         class: 'outliner-editor outline-none min-h-full px-8 py-10',
       },
+      handleKeyDown(_view, e) {
+        const sc = shortcutsRef.current
+        const ed = editorRef.current
+        if (!ed) return false
+
+        if (matchesEvent(e, sc.bulletList)) {
+          e.preventDefault()
+          ed.commands.toggleBulletList()
+          return true
+        }
+        if (matchesEvent(e, sc.link)) {
+          e.preventDefault()
+          if (ed.isActive('link')) {
+            ed.commands.unsetLink()
+            return true
+          }
+          const { from, to } = ed.state.selection
+          if (from === to) return false
+          const selectedText = ed.state.doc.textBetween(from, to).trim()
+          try {
+            const url = new URL(selectedText)
+            ed.commands.setLink({ href: url.href, target: '_blank' })
+            return true
+          } catch {
+            return false
+          }
+        }
+        return false
+      },
     },
     onUpdate({ editor }) {
       const id = activeFileIdRef.current
       if (id) onChange(id, editor.getJSON())
+    },
+    onCreate({ editor }) {
+      editorRef.current = editor
     },
   })
 
