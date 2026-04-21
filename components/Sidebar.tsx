@@ -226,10 +226,10 @@ function AppearanceOverlay({
   const modeLabel = mode === 'light' ? '☀️ ライトモード' : '🌙 ダークモード'
 
   return (
-    <div className="fixed inset-0 z-50 bg-[var(--ts-bg-main)] overflow-y-auto help-overlay-enter">
+    <div className="fixed inset-0 z-50 bg-[var(--ts-bg-main)] flex flex-col help-overlay-enter">
 
       {/* ヘッダー */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 ts-bg-main-alpha backdrop-blur-md border-b border-gray-200 dark:border-zinc-800">
+      <header className="flex-none flex items-center justify-between px-6 py-4 ts-bg-main-alpha backdrop-blur-md border-b border-gray-200 dark:border-zinc-800">
         <button
           onClick={onClose}
           className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-zinc-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors"
@@ -246,37 +246,42 @@ function AppearanceOverlay({
         <div className="w-20" />
       </header>
 
-      {/* コンテンツ */}
-      <div className="max-w-xl mx-auto px-6 py-8 space-y-8">
-
-        {/* プレビューカード */}
-        <div
-          className="rounded-xl border border-black/10 dark:border-white/10 p-5 space-y-3 transition-colors"
-          style={{ backgroundColor: activeColors.bg }}
-        >
-          <p className="text-[10px] font-bold uppercase tracking-widest mb-3"
-             style={{ color: activeColors.accent }}>
-            プレビュー
-          </p>
-          <p className="text-sm font-semibold mb-2" style={{ color: activeColors.text }}>
-            思考を素早く整理する
-          </p>
-          <ul className="space-y-1.5 pl-1">
-            {[
-              'アイデアをすぐにメモできる',
-              'タスクを箇条書きで管理する',
-              'ノートを構造化して整理する',
-            ].map((item, i) => (
-              <li key={i} className="flex items-center gap-2 text-sm">
-                <span style={{ color: i === 0 ? activeColors.marker : `${activeColors.marker}99` }}>●</span>
-                <span style={{ color: activeColors.text }}>{item}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="text-xs mt-2 underline underline-offset-2" style={{ color: activeColors.accent }}>
-            リンクのアクセントカラー
-          </p>
+      {/* プレビューカード（固定表示） */}
+      <div className="flex-none border-b border-gray-200 dark:border-zinc-800 px-6 py-4">
+        <div className="max-w-xl mx-auto">
+          <div
+            className="rounded-xl border border-black/10 dark:border-white/10 p-5 space-y-3 transition-colors"
+            style={{ backgroundColor: activeColors.bg }}
+          >
+            <p className="text-[10px] font-bold uppercase tracking-widest mb-3"
+               style={{ color: activeColors.accent }}>
+              プレビュー
+            </p>
+            <p className="text-sm font-semibold mb-2" style={{ color: activeColors.text }}>
+              思考を素早く整理する
+            </p>
+            <ul className="space-y-1.5 pl-1">
+              {[
+                'アイデアをすぐにメモできる',
+                'タスクを箇条書きで管理する',
+                'ノートを構造化して整理する',
+              ].map((item, i) => (
+                <li key={i} className="flex items-center gap-2 text-sm">
+                  <span style={{ color: i === 0 ? activeColors.marker : `${activeColors.marker}99` }}>●</span>
+                  <span style={{ color: activeColors.text }}>{item}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs mt-2 underline underline-offset-2" style={{ color: activeColors.accent }}>
+              リンクのアクセントカラー
+            </p>
+          </div>
         </div>
+      </div>
+
+      {/* 各カラーセクション（スクロール可能） */}
+      <div className="flex-1 overflow-y-auto">
+      <div className="max-w-xl mx-auto px-6 py-8 space-y-8">
 
         {/* 各カラーセクション */}
         {sections.map(({ key, label, swatches }) => {
@@ -333,6 +338,7 @@ function AppearanceOverlay({
           )
         })}
 
+      </div>
       </div>
     </div>
   )
