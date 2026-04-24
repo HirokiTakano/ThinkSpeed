@@ -6,6 +6,7 @@ import type { Editor as TiptapEditor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Youtube from '@tiptap/extension-youtube'
+import Image from '@tiptap/extension-image'
 import { Extension } from '@tiptap/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FileItem } from '@/hooks/useStore'
@@ -139,6 +140,12 @@ function nodeToMarkdown(node: TiptapNode, depth = 0): string {
       return `[YouTube Video](${src})`
     }
 
+    case 'image': {
+      const src = (node.attrs?.src as string) ?? ''
+      const alt = (node.attrs?.alt as string) ?? 'image'
+      return `![${alt}](${src.startsWith('data:') ? '[base64 image]' : src})`
+    }
+
     default:
       return (node.content ?? []).map(c => nodeToMarkdown(c, depth)).join('')
   }
@@ -181,6 +188,11 @@ export default function Editor({ file, onChange, shortcuts }: Props) {
         allowFullscreen: true,
         nocookie: true,
         HTMLAttributes: { class: 'youtube-embed' },
+      }),
+      Image.configure({
+        inline: true,
+        allowBase64: true,
+        HTMLAttributes: { class: 'editor-image' },
       }),
       DeepIndent,
       Placeholder.configure({ placeholder: '思考を書き始めよう...' }),
@@ -241,6 +253,38 @@ export default function Editor({ file, onChange, shortcuts }: Props) {
     // フォーカスを先頭に
     editor.commands.focus('start')
   }, [editor, file])
+
+  // 画像ペースト: items/files 両方を試みて base64 挿入
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const onPaste = (e: ClipboardEvent) => {
+      const cd = e.clipboardData
+      if (!cd) return
+
+      let imageFile: File | null = null
+      const items = Array.from(cd.items ?? [])
+      const imgItem = items.find(it => it.type.startsWith('image/'))
+      if (imgItem) imageFile = imgItem.getAsFile()
+      if (!imageFile && cd.files.length > 0 && cd.files[0].type.startsWith('image/')) {
+        imageFile = cd.files[0]
+      }
+      if (!imageFile) return
+
+      e.preventDefault()
+      e.stopPropagation()
+
+      const reader = new FileReader()
+      reader.onload = (re) => {
+        const src = re.target?.result as string
+        if (!src) return
+        editor.commands.insertContent({ type: 'image', attrs: { src } })
+      }
+      reader.readAsDataURL(imageFile)
+    }
+    dom.addEventListener('paste', onPaste)
+    return () => dom.removeEventListener('paste', onPaste)
+  }, [editor])
 
   const copyMarkdown = useCallback(async () => {
     if (!editor) return

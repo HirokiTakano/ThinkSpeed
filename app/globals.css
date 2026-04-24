@@ -242,6 +242,24 @@ body {
   outline-offset: 2px;
 }
 
+/* =====================
+   画像
+   ===================== */
+.outliner-editor .editor-image,
+.ProseMirror .editor-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 0.75rem 0;
+  display: block;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+}
+.outliner-editor .editor-image.ProseMirror-selectednode,
+.ProseMirror .editor-image.ProseMirror-selectednode {
+  outline: 2px solid var(--ts-accent);
+  outline-offset: 2px;
+}
+
 /* ダークモード固有: コード背景のみ維持 */
 .dark .outliner-editor code {
   background: #27272a;
