@@ -1,7 +1,8 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import type { Folder } from '@/hooks/useStore'
+import CalendarOverlay from '@/components/CalendarOverlay'
 import {
   BG_LIGHT_SWATCHES, BG_DARK_SWATCHES,
   TEXT_LIGHT_SWATCHES, TEXT_DARK_SWATCHES,
@@ -227,6 +228,33 @@ function HelpOverlay({
                 <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">{desc}</p>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* カレンダー */}
+        <section className="space-y-3">
+          <h3 className="text-[10px] font-bold text-gray-400 dark:text-zinc-600 uppercase tracking-widest">カレンダー</h3>
+          <div className="rounded-xl bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/20 border border-indigo-100 dark:border-indigo-900/40 p-4 space-y-3">
+            <p className="text-xs text-gray-600 dark:text-zinc-400 leading-relaxed">
+              ノートの本文に日付とタスクを書くと、自動的にカレンダーへ登録されます。
+            </p>
+            <div className="space-y-1.5">
+              {([
+                ['4/23 13時: タスク名', 'スラッシュ形式'],
+                ['10月4日 13時: タスク名', '日本語形式'],
+                ['10月4日 13時30分: タスク名', '時刻 + 分'],
+                ['10月4日: タスク名', '日付のみ（終日）'],
+                ['2026年10月4日 13時: タスク名', '年も指定できます'],
+              ] as const).map(([example, label]) => (
+                <div key={example} className="flex items-center gap-2 flex-wrap">
+                  <code className="font-mono text-[11px] bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded">{example}</code>
+                  <span className="text-[10px] text-gray-400 dark:text-zinc-500">{label}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-indigo-500 dark:text-indigo-400 font-medium">
+              💡 日付をクリックするとその日のタスクが表示されます
+            </p>
           </div>
         </section>
 
@@ -504,7 +532,21 @@ export default function Sidebar({
   const [importFeedback, setImportFeedback] = useState<'idle' | 'ok' | 'err'>('idle')
   const [showHelp, setShowHelp] = useState(false)
   const [showAppearance, setShowAppearance] = useState(false)
+  const [showCalendar, setShowCalendar] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // カレンダーからファイルを選ぶとき、親フォルダを自動展開する
+  const selectAndRevealFile = useCallback((fileId: string) => {
+    const folder = folders.find(f => f.files.some(file => file.id === fileId))
+    if (folder) {
+      setClosedFolders(prev => {
+        const next = new Set(prev)
+        next.delete(folder.id)
+        return next
+      })
+    }
+    onSelectFile(fileId)
+  }, [folders, onSelectFile])
 
   const totalFiles = folders.reduce((n, f) => n + f.files.length, 0)
 
@@ -766,6 +808,27 @@ export default function Sidebar({
         </button>
       </div>
 
+      {/* カレンダー */}
+      <div className="border-t border-gray-200/80 dark:border-zinc-800/80">
+        <button
+          onClick={() => setShowCalendar(true)}
+          className="w-full flex items-center justify-between px-4 py-2.5 text-[10px] font-medium text-gray-400 dark:text-zinc-600 uppercase tracking-wide hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors group"
+        >
+          <span className="flex items-center gap-1.5">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            カレンダー
+          </span>
+          <svg className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      </div>
+
       {/* 外観 */}
       <div className="border-t border-gray-200/80 dark:border-zinc-800/80">
         <button
@@ -805,6 +868,13 @@ export default function Sidebar({
         </button>
       </div>
     </aside>
+    {showCalendar && (
+      <CalendarOverlay
+        folders={folders}
+        onSelectFile={selectAndRevealFile}
+        onClose={() => setShowCalendar(false)}
+      />
+    )}
     {showHelp && (
       <HelpOverlay
         shortcuts={shortcuts}

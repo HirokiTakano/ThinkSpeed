@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { JSONContent } from '@tiptap/react'
 
-export type FileItem = { id: string; name: string; content: JSONContent }
+export type FileItem = { id: string; name: string; content: JSONContent; createdOn?: string }
 export type Folder = { id: string; name: string; files: FileItem[] }
 
 type Store = { folders: Folder[]; activeFileId: string | null }
@@ -16,8 +16,13 @@ const EMPTY_BULLET_CONTENT: JSONContent = {
   content: [{ type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph' }] }] }],
 }
 
+function localDateString(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function newFile(name = '無題のノート'): FileItem {
-  return { id: crypto.randomUUID(), name, content: EMPTY_BULLET_CONTENT }
+  return { id: crypto.randomUUID(), name, content: EMPTY_BULLET_CONTENT, createdOn: localDateString() }
 }
 
 function newFolder(name = '新しいフォルダ'): Folder {
