@@ -353,6 +353,145 @@ function HelpOverlay({
   )
 }
 
+function PatchNotesOverlay({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  const RELEASES = [
+    {
+      version: 'v0.3',
+      date: '2025年4月',
+      label: '画像サポート',
+      color: 'emerald',
+      items: [
+        { icon: '🖼️', text: 'エディタに画像をそのまま貼り付けられるようになりました（Ctrl/Cmd + V）' },
+        { icon: '📋', text: 'スクリーンショットやクリップボードの画像に対応' },
+        { icon: '💾', text: '画像はノートと一緒に localStorage に保存されます' },
+      ],
+    },
+    {
+      version: 'v0.2',
+      date: '2025年4月',
+      label: 'カレンダー刷新',
+      color: 'indigo',
+      items: [
+        { icon: '📅', text: 'カレンダーがノートの内容を自動解析してタスクを登録するように変わりました' },
+        { icon: '✍️', text: '「10月4日 13時: タスク名」と書くだけで自動登録' },
+        { icon: '📝', text: '「4/23 15時30分: タスク」形式（スラッシュ表記）にも対応' },
+        { icon: '🗓️', text: '全角数字・「終日」タスク・年付き表記にも対応' },
+        { icon: '🔗', text: 'カレンダーからタスクをクリックして該当ノートに即ジャンプ' },
+      ],
+    },
+    {
+      version: 'v0.1',
+      date: '2025年初期',
+      label: '初回リリース',
+      color: 'violet',
+      items: [
+        { icon: '✦', text: '箇条書きベースのアウトライナーエディタ' },
+        { icon: '📁', text: 'フォルダ・ファイルによる階層管理' },
+        { icon: '⌨️', text: 'Tab / Shift+Tab による深いインデント対応' },
+        { icon: '🔗', text: 'URL の自動リンク化・YouTube 動画の埋め込み' },
+        { icon: '🌙', text: 'ダークモード / ライトモード切替' },
+        { icon: '🎨', text: '背景色・文字色・アクセントカラーのカスタマイズ' },
+        { icon: '⚡', text: 'キーボードショートカットのカスタマイズ' },
+        { icon: '📤', text: 'JSON でのエクスポート / インポート' },
+        { icon: '📋', text: 'Markdown コピー機能' },
+      ],
+    },
+  ] as const
+
+  const colorMap = {
+    emerald: {
+      badge: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+      dot: 'bg-emerald-400',
+      line: 'border-emerald-200 dark:border-emerald-800/60',
+    },
+    indigo: {
+      badge: 'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
+      dot: 'bg-indigo-400',
+      line: 'border-indigo-200 dark:border-indigo-800/60',
+    },
+    violet: {
+      badge: 'bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800',
+      dot: 'bg-violet-400',
+      line: 'border-violet-200 dark:border-violet-800/60',
+    },
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[var(--ts-bg-main)] overflow-y-auto help-overlay-enter">
+
+      {/* ヘッダー */}
+      <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 ts-bg-main-alpha backdrop-blur-md border-b border-gray-200 dark:border-zinc-800">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-zinc-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          戻る
+        </button>
+        <div className="flex items-center gap-1.5">
+          <span className="text-indigo-500">✦</span>
+          <span className="text-sm font-semibold text-gray-700 dark:text-zinc-200">パッチノート</span>
+        </div>
+        <div className="w-14" />
+      </header>
+
+      <div className="max-w-xl mx-auto px-6 py-8">
+        <div className="relative pl-6">
+          {/* 縦線 */}
+          <div className="absolute left-2 top-3 bottom-3 w-px bg-gray-100 dark:bg-zinc-800" />
+
+          <div className="space-y-10">
+            {RELEASES.map((release) => {
+              const c = colorMap[release.color]
+              return (
+                <div key={release.version} className="relative">
+                  {/* タイムラインドット */}
+                  <div className={`absolute -left-4 top-1 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-zinc-900 ${c.dot}`} />
+
+                  <div className="space-y-3">
+                    {/* バージョンヘッダー */}
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${c.badge}`}>
+                        {release.version}
+                      </span>
+                      <span className="text-sm font-semibold text-gray-700 dark:text-zinc-200">
+                        {release.label}
+                      </span>
+                      <span className="text-[10px] text-gray-400 dark:text-zinc-500">
+                        {release.date}
+                      </span>
+                    </div>
+
+                    {/* 変更内容 */}
+                    <div className={`rounded-xl border ${c.line} bg-white dark:bg-zinc-800/40 overflow-hidden divide-y divide-gray-50 dark:divide-zinc-800/60`}>
+                      {release.items.map((item) => (
+                        <div key={item.text} className="flex items-start gap-3 px-4 py-2.5">
+                          <span className="text-base leading-tight shrink-0">{item.icon}</span>
+                          <span className="text-xs text-gray-600 dark:text-zinc-300 leading-relaxed">
+                            {item.text}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AppearanceOverlay({
   theme,
   lightColors,
@@ -533,6 +672,7 @@ export default function Sidebar({
   const [showHelp, setShowHelp] = useState(false)
   const [showAppearance, setShowAppearance] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
+  const [showPatchNotes, setShowPatchNotes] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // カレンダーからファイルを選ぶとき、親フォルダを自動展開する
@@ -867,12 +1007,35 @@ export default function Sidebar({
           </svg>
         </button>
       </div>
+
+      {/* パッチノート */}
+      <div className="border-t border-gray-200/80 dark:border-zinc-800/80">
+        <button
+          onClick={() => setShowPatchNotes(true)}
+          className="w-full flex items-center justify-between px-4 py-2.5 text-[10px] font-medium text-gray-400 dark:text-zinc-600 uppercase tracking-wide hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors group"
+        >
+          <span className="flex items-center gap-1.5">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+            パッチノート
+          </span>
+          <svg className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      </div>
     </aside>
     {showCalendar && (
       <CalendarOverlay
         folders={folders}
         onSelectFile={selectAndRevealFile}
         onClose={() => setShowCalendar(false)}
+        onOpenHelp={() => { setShowCalendar(false); setShowHelp(true) }}
       />
     )}
     {showHelp && (
@@ -890,6 +1053,9 @@ export default function Sidebar({
         onChangeColor={onChangeColor}
         onClose={() => setShowAppearance(false)}
       />
+    )}
+    {showPatchNotes && (
+      <PatchNotesOverlay onClose={() => setShowPatchNotes(false)} />
     )}
     </>
   )
