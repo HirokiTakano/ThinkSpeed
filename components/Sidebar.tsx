@@ -538,14 +538,22 @@ function TrashOverlay({
   const sorted = [...trash].sort((a, b) => b.deletedAt - a.deletedAt)
 
   return (
-    <div className="fixed inset-0 z-50 bg-[var(--ts-bg-main)] flex flex-col help-overlay-enter">
+    <div className="fixed inset-0 z-50 bg-[var(--ts-bg-main)] overflow-y-auto help-overlay-enter">
       {/* ヘッダー */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-zinc-800">
-        <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 ts-bg-main-alpha backdrop-blur-md border-b border-gray-200 dark:border-zinc-800">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-zinc-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          戻る
+        </button>
+        <div className="flex items-center gap-1.5">
           <svg className="w-4 h-4 text-gray-500 dark:text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="3 6 5 6 21 6" />
             <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-            <path d="M10 11v6M14 11v6" />
             <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
           </svg>
           <span className="text-sm font-semibold text-gray-700 dark:text-zinc-200">ゴミ箱</span>
@@ -553,16 +561,12 @@ function TrashOverlay({
             <span className="text-xs text-gray-400 dark:text-zinc-500">({trash.length}件)</span>
           )}
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300 transition-colors">
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </div>
+        <div className="w-14" />
+      </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="max-w-xl mx-auto px-6 py-6">
         {trash.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400 dark:text-zinc-600 select-none">
+          <div className="flex flex-col items-center justify-center py-24 gap-3 text-gray-400 dark:text-zinc-600 select-none">
             <svg className="w-10 h-10 opacity-40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <polyline points="3 6 5 6 21 6" />
               <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -650,13 +654,12 @@ function TrashOverlay({
                 </div>
               )
             })}
+
+            <p className="text-[10px] text-gray-400 dark:text-zinc-600 text-center pt-4">
+              削除されたアイテムは30日後に自動で完全削除されます
+            </p>
           </div>
         )}
-      </div>
-      <div className="px-4 py-3 border-t border-gray-200 dark:border-zinc-800">
-        <p className="text-[10px] text-gray-400 dark:text-zinc-600 text-center">
-          削除されたアイテムは30日後に自動で完全削除されます
-        </p>
       </div>
     </div>
   )
