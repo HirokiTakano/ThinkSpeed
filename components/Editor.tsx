@@ -115,25 +115,6 @@ function nodeToMarkdown(node: TiptapNode, depth = 0): string {
         .map(c => nodeToMarkdown(c, depth))
         .join('\n')
 
-    case 'orderedList': {
-      const start = (node.attrs?.start as number) ?? 1
-      return (node.content ?? [])
-        .map((item, i) => {
-          const num = start + i
-          const parts: string[] = []
-          for (const child of item.content ?? []) {
-            if (child.type === 'paragraph') {
-              const text = (child.content ?? []).map(c => nodeToMarkdown(c)).join('')
-              parts.push(`${indent}${num}. ${text}`)
-            } else if (child.type === 'orderedList' || child.type === 'bulletList') {
-              parts.push(nodeToMarkdown(child, depth + 1))
-            }
-          }
-          return parts.join('\n')
-        })
-        .join('\n')
-    }
-
     case 'taskList':
       return (node.content ?? [])
         .map(c => nodeToMarkdown(c, depth))
@@ -146,7 +127,7 @@ function nodeToMarkdown(node: TiptapNode, depth = 0): string {
         if (child.type === 'paragraph') {
           const text = (child.content ?? []).map(c => nodeToMarkdown(c)).join('')
           parts.push(`${indent}- [${checked ? 'x' : ' '}] ${text}`)
-        } else if (child.type === 'taskList' || child.type === 'bulletList' || child.type === 'orderedList') {
+        } else if (child.type === 'taskList' || child.type === 'bulletList') {
           parts.push(nodeToMarkdown(child, depth + 1))
         }
       }
@@ -159,7 +140,7 @@ function nodeToMarkdown(node: TiptapNode, depth = 0): string {
         if (child.type === 'paragraph') {
           const text = (child.content ?? []).map(c => nodeToMarkdown(c)).join('')
           parts.push(`${indent}- ${text}`)
-        } else if (child.type === 'bulletList' || child.type === 'orderedList') {
+        } else if (child.type === 'bulletList') {
           parts.push(nodeToMarkdown(child, depth + 1))
         }
       }
@@ -262,11 +243,6 @@ export default function Editor({ file, onChange, shortcuts }: Props) {
         if (matchesEvent(e, sc.bulletList)) {
           e.preventDefault()
           ed.commands.toggleBulletList()
-          return true
-        }
-        if (matchesEvent(e, sc.orderedList)) {
-          e.preventDefault()
-          ed.commands.toggleOrderedList()
           return true
         }
         if (matchesEvent(e, sc.taskList)) {
