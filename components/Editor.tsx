@@ -7,6 +7,8 @@ import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Youtube from '@tiptap/extension-youtube'
 import Image from '@tiptap/extension-image'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
 import { Extension } from '@tiptap/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FileItem } from '@/hooks/useStore'
@@ -39,6 +41,9 @@ const DeepIndent = Extension.create({
     return {
       Tab: () => {
         const { editor } = this
+
+        // taskItem のインデント
+        if (editor.commands.sinkListItem('taskItem')) return true
         // 標準の sink が成功すればそれを使う
         if (editor.commands.sinkListItem('listItem')) return true
 
@@ -66,6 +71,12 @@ const DeepIndent = Extension.create({
         // 挿入後は現在のアイテムに前の兄弟ができるので sinkListItem が成功する
         editor.commands.sinkListItem('listItem')
         return true
+      },
+      'Shift-Tab': () => {
+        const { editor } = this
+        if (editor.commands.liftListItem('taskItem')) return true
+        if (editor.commands.liftListItem('listItem')) return true
+        return false
       },
     }
   },
@@ -103,6 +114,25 @@ function nodeToMarkdown(node: TiptapNode, depth = 0): string {
       return (node.content ?? [])
         .map(c => nodeToMarkdown(c, depth))
         .join('\n')
+
+    case 'taskList':
+      return (node.content ?? [])
+        .map(c => nodeToMarkdown(c, depth))
+        .join('\n')
+
+    case 'taskItem': {
+      const checked = (node.attrs?.checked as boolean) ?? false
+      const parts: string[] = []
+      for (const child of node.content ?? []) {
+        if (child.type === 'paragraph') {
+          const text = (child.content ?? []).map(c => nodeToMarkdown(c)).join('')
+          parts.push(`${indent}- [${checked ? 'x' : ' '}] ${text}`)
+        } else if (child.type === 'taskList' || child.type === 'bulletList') {
+          parts.push(nodeToMarkdown(child, depth + 1))
+        }
+      }
+      return parts.join('\n')
+    }
 
     case 'listItem': {
       const parts: string[] = []
@@ -194,6 +224,8 @@ export default function Editor({ file, onChange, shortcuts }: Props) {
         allowBase64: true,
         HTMLAttributes: { class: 'editor-image' },
       }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
       DeepIndent,
       Placeholder.configure({ placeholder: '思考を書き始めよう...' }),
     ],
@@ -211,6 +243,11 @@ export default function Editor({ file, onChange, shortcuts }: Props) {
         if (matchesEvent(e, sc.bulletList)) {
           e.preventDefault()
           ed.commands.toggleBulletList()
+          return true
+        }
+        if (matchesEvent(e, sc.taskList)) {
+          e.preventDefault()
+          ed.commands.toggleTaskList()
           return true
         }
         if (matchesEvent(e, sc.link)) {

@@ -29,6 +29,9 @@ export default function Home() {
     renameFile,
     deleteFolder,
     deleteFile,
+    restoreFromTrash,
+    permanentlyDelete,
+    emptyTrash,
     exportData,
     exportFolder,
     exportFile,
@@ -101,6 +104,10 @@ export default function Home() {
         onRenameFile={renameFile}
         onDeleteFolder={deleteFolder}
         onDeleteFile={deleteFile}
+        trash={store.trash}
+        onRestoreFromTrash={restoreFromTrash}
+        onPermanentlyDelete={permanentlyDelete}
+        onEmptyTrash={emptyTrash}
         onExport={exportData}
         onExportFolder={exportFolder}
         onExportFile={exportFile}

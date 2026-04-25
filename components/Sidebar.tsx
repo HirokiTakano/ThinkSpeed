@@ -1,8 +1,7 @@
 'use client'
 
 import { useRef, useState, useEffect, useCallback } from 'react'
-import type { Folder } from '@/hooks/useStore'
-import type { ImportMode } from '@/hooks/useStore'
+import type { Folder, ImportMode, TrashEntry } from '@/hooks/useStore'
 import CalendarOverlay from '@/components/CalendarOverlay'
 import {
   BG_LIGHT_SWATCHES, BG_DARK_SWATCHES,
@@ -25,6 +24,10 @@ type Props = {
   onRenameFile: (id: string, name: string) => void
   onDeleteFolder: (id: string) => void
   onDeleteFile: (id: string) => void
+  trash: TrashEntry[]
+  onRestoreFromTrash: (trashId: string) => void
+  onPermanentlyDelete: (trashId: string) => void
+  onEmptyTrash: () => void
   onExport: () => void
   onExportFolder: (folderId: string) => void
   onExportFile: (fileId: string) => void
@@ -141,7 +144,7 @@ function HelpOverlay({
       const otherActions = (Object.keys(shortcuts) as Array<keyof ShortcutConfig>).filter(k => k !== recording)
       const conflict = otherActions.find(k => defsConflict(shortcuts[k], newDef))
       if (conflict) {
-        const labels: Record<keyof ShortcutConfig, string> = { bulletList: '箇条書きトグル', link: 'リンク設定' }
+        const labels: Record<keyof ShortcutConfig, string> = { bulletList: '箇条書きトグル', taskList: 'チェックリストトグル', link: 'リンク設定' }
         setError(`「${labels[conflict]}」と競合しています`)
         return
       }
@@ -156,6 +159,7 @@ function HelpOverlay({
 
   const SHORTCUT_ROWS: { action: keyof ShortcutConfig; label: string; fixed?: boolean }[] = [
     { action: 'bulletList', label: '箇条書きのオン / オフ' },
+    { action: 'taskList',   label: 'チェックリストのオン / オフ' },
     { action: 'link',       label: 'リンクの設定 / 解除' },
   ]
   const FIXED_ROWS = [
@@ -276,7 +280,8 @@ function HelpOverlay({
             <button
               onClick={() => {
                 onChangeShortcut('bulletList', DEFAULT_SHORTCUTS.bulletList)
-                onChangeShortcut('link', DEFAULT_SHORTCUTS.link)
+                onChangeShortcut('taskList',   DEFAULT_SHORTCUTS.taskList)
+                onChangeShortcut('link',       DEFAULT_SHORTCUTS.link)
               }}
               className="text-[10px] text-gray-400 hover:text-indigo-500 dark:text-zinc-600 dark:hover:text-indigo-400 transition-colors"
             >
@@ -498,6 +503,163 @@ function PatchNotesOverlay({ onClose }: { onClose: () => void }) {
             })}
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function TrashOverlay({
+  trash,
+  onRestore,
+  onDelete,
+  onEmpty,
+  onClose,
+}: {
+  trash: TrashEntry[]
+  onRestore: (id: string) => void
+  onDelete: (id: string) => void
+  onEmpty: () => void
+  onClose: () => void
+}) {
+  const [confirmEmpty, setConfirmEmpty] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  const daysLeft = (deletedAt: number) => {
+    const elapsed = Date.now() - deletedAt
+    const remaining = Math.ceil((30 * 24 * 60 * 60 * 1000 - elapsed) / (24 * 60 * 60 * 1000))
+    return Math.max(0, remaining)
+  }
+
+  const sorted = [...trash].sort((a, b) => b.deletedAt - a.deletedAt)
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[var(--ts-bg-main)] overflow-y-auto help-overlay-enter">
+      {/* ヘッダー */}
+      <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 ts-bg-main-alpha backdrop-blur-md border-b border-gray-200 dark:border-zinc-800">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-zinc-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          戻る
+        </button>
+        <div className="flex items-center gap-1.5">
+          <svg className="w-4 h-4 text-gray-500 dark:text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+          </svg>
+          <span className="text-sm font-semibold text-gray-700 dark:text-zinc-200">ゴミ箱</span>
+          {trash.length > 0 && (
+            <span className="text-xs text-gray-400 dark:text-zinc-500">({trash.length}件)</span>
+          )}
+        </div>
+        <div className="w-14" />
+      </header>
+
+      <div className="max-w-xl mx-auto px-6 py-6">
+        {trash.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-3 text-gray-400 dark:text-zinc-600 select-none">
+            <svg className="w-10 h-10 opacity-40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+            </svg>
+            <p className="text-sm">ゴミ箱は空です</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {/* ゴミ箱を空にするボタン */}
+            {confirmEmpty ? (
+              <div className="px-4 py-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 mb-4">
+                <p className="text-xs text-red-700 dark:text-red-300 mb-3">すべてのアイテムを完全に削除します。この操作は取り消せません。</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { onEmpty(); setConfirmEmpty(false) }}
+                    className="flex-1 px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-medium transition-colors"
+                  >完全に削除する</button>
+                  <button
+                    onClick={() => setConfirmEmpty(false)}
+                    className="flex-1 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-600 dark:text-zinc-300 text-xs font-medium transition-colors"
+                  >キャンセル</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmEmpty(true)}
+                className="w-full mb-2 px-4 py-2 rounded-xl border border-red-200 dark:border-red-900 text-red-500 dark:text-red-400 text-xs font-medium hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+              >
+                ゴミ箱を空にする
+              </button>
+            )}
+
+            {/* アイテム一覧 */}
+            {sorted.map(entry => {
+              const isFolder = entry.type === 'folder'
+              const name = isFolder
+                ? (entry.payload as { name: string }).name
+                : (entry.payload as { name: string }).name
+              const left = daysLeft(entry.deletedAt)
+              return (
+                <div key={entry.id} className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-zinc-800/60 border border-gray-100 dark:border-zinc-800">
+                  <div className="flex-shrink-0 mt-0.5">
+                    {isFolder ? (
+                      <svg className="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4 text-gray-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-700 dark:text-zinc-200 truncate">{name}</p>
+                    {!isFolder && entry.parentFolderName && (
+                      <p className="text-[10px] text-gray-400 dark:text-zinc-600 truncate">フォルダ: {entry.parentFolderName}</p>
+                    )}
+                    <p className={`text-[10px] mt-0.5 ${left <= 3 ? 'text-red-400' : 'text-gray-400 dark:text-zinc-600'}`}>
+                      {left}日後に完全削除
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => onRestore(entry.id)}
+                      title="元に戻す"
+                      className="p-1.5 rounded-lg text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                        <path d="M3 3v5h5" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => onDelete(entry.id)}
+                      title="完全に削除"
+                      className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+
+            <p className="text-[10px] text-gray-400 dark:text-zinc-600 text-center pt-4">
+              削除されたアイテムは30日後に自動で完全削除されます
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -981,6 +1143,10 @@ export default function Sidebar({
   onRenameFile,
   onDeleteFolder,
   onDeleteFile,
+  trash,
+  onRestoreFromTrash,
+  onPermanentlyDelete,
+  onEmptyTrash,
   onExport,
   onExportFolder,
   onExportFile,
@@ -1003,6 +1169,7 @@ export default function Sidebar({
   const [showCalendar, setShowCalendar] = useState(false)
   const [showPatchNotes, setShowPatchNotes] = useState(false)
   const [showDataMgmt, setShowDataMgmt] = useState(false)
+  const [showTrash, setShowTrash] = useState(false)
 
   // カレンダーからファイルを選ぶとき、親フォルダを自動展開する
   const selectAndRevealFile = useCallback((fileId: string) => {
@@ -1323,6 +1490,31 @@ export default function Sidebar({
           </svg>
         </button>
       </div>
+
+      {/* ゴミ箱 */}
+      <div className="border-t border-gray-200/80 dark:border-zinc-800/80">
+        <button
+          onClick={() => setShowTrash(true)}
+          className="w-full flex items-center justify-between px-4 py-2.5 text-[10px] font-medium text-gray-400 dark:text-zinc-600 uppercase tracking-wide hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors group"
+        >
+          <span className="flex items-center gap-1.5">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+            </svg>
+            ゴミ箱
+            {trash.length > 0 && (
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 dark:bg-zinc-700 text-gray-500 dark:text-zinc-400 text-[9px] font-bold">
+                {trash.length}
+              </span>
+            )}
+          </span>
+          <svg className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      </div>
     </aside>
     {showCalendar && (
       <CalendarOverlay
@@ -1350,6 +1542,15 @@ export default function Sidebar({
     )}
     {showPatchNotes && (
       <PatchNotesOverlay onClose={() => setShowPatchNotes(false)} />
+    )}
+    {showTrash && (
+      <TrashOverlay
+        trash={trash}
+        onRestore={onRestoreFromTrash}
+        onDelete={onPermanentlyDelete}
+        onEmpty={onEmptyTrash}
+        onClose={() => setShowTrash(false)}
+      />
     )}
     {showDataMgmt && (
       <DataManagementOverlay

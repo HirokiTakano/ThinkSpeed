@@ -7,7 +7,16 @@ export type FileItem = { id: string; name: string; content: JSONContent; created
 export type Folder = { id: string; name: string; files: FileItem[] }
 export type ImportMode = 'overwrite' | 'rename'
 
-type Store = { folders: Folder[]; activeFileId: string | null }
+export type TrashEntry = {
+  id: string
+  type: 'folder' | 'file'
+  payload: Folder | FileItem
+  parentFolderId?: string
+  parentFolderName?: string
+  deletedAt: number
+}
+
+type Store = { folders: Folder[]; activeFileId: string | null; trash: TrashEntry[] }
 
 const STORE_KEY = 'outliner-store-v2'
 const LEGACY_KEY = 'outliner-content'
@@ -33,16 +42,23 @@ function newFolder(name = '新しいフォルダ'): Folder {
 
 function defaultStore(): Store {
   const folder = newFolder('はじめのフォルダ')
-  return { folders: [folder], activeFileId: folder.files[0].id }
+  return { folders: [folder], activeFileId: folder.files[0].id, trash: [] }
 }
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
 
 function loadFromStorage(): Store {
   // Try new format
   const saved = localStorage.getItem(STORE_KEY)
   if (saved) {
     try {
-      const parsed = JSON.parse(saved) as Store
-      if (parsed.folders && Array.isArray(parsed.folders)) return parsed
+      const parsed = JSON.parse(saved)
+      if (parsed.folders && Array.isArray(parsed.folders)) {
+        const trash: TrashEntry[] = Array.isArray(parsed.trash)
+          ? (parsed.trash as TrashEntry[]).filter(t => Date.now() - t.deletedAt < THIRTY_DAYS_MS)
+          : []
+        return { folders: parsed.folders, activeFileId: parsed.activeFileId ?? null, trash }
+      }
     } catch { /* fall through */ }
   }
 
@@ -53,7 +69,7 @@ function loadFromStorage(): Store {
       const content = JSON.parse(legacy) as JSONContent
       const folder = newFolder('はじめのフォルダ')
       folder.files[0] = { ...folder.files[0], content }
-      return { folders: [folder], activeFileId: folder.files[0].id }
+      return { folders: [folder], activeFileId: folder.files[0].id, trash: [] }
     } catch { /* fall through */ }
   }
 
@@ -61,7 +77,7 @@ function loadFromStorage(): Store {
 }
 
 export function useStore() {
-  const [store, setStore] = useState<Store>({ folders: [], activeFileId: null })
+  const [store, setStore] = useState<Store>({ folders: [], activeFileId: null, trash: [] })
   const hydrated = useRef(false)
 
   // Load from localStorage on mount (client only)
@@ -98,6 +114,7 @@ export function useStore() {
   const addFolder = useCallback(() => {
     const folder = newFolder()
     setStore(s => ({
+      ...s,
       folders: [...s.folders, folder],
       activeFileId: folder.files[0].id,
     }))
@@ -134,11 +151,19 @@ export function useStore() {
   const deleteFolder = useCallback((folderId: string) => {
     setStore(s => {
       if (s.folders.length <= 1) return s // 最後の1つは削除不可
+      const folder = s.folders.find(f => f.id === folderId)
+      if (!folder) return s
       const folders = s.folders.filter(f => f.id !== folderId)
       const allFiles = folders.flatMap(f => f.files)
       const activeFileId =
         allFiles.find(f => f.id === s.activeFileId)?.id ?? allFiles[0]?.id ?? null
-      return { folders, activeFileId }
+      const entry: TrashEntry = {
+        id: crypto.randomUUID(),
+        type: 'folder',
+        payload: folder,
+        deletedAt: Date.now(),
+      }
+      return { ...s, folders, activeFileId, trash: [...s.trash, entry] }
     })
   }, [])
 
@@ -147,6 +172,14 @@ export function useStore() {
       // 全ファイル数が1以下なら削除不可
       const totalFiles = s.folders.reduce((n, f) => n + f.files.length, 0)
       if (totalFiles <= 1) return s
+
+      let parentFolder: Folder | undefined
+      let fileItem: FileItem | undefined
+      for (const f of s.folders) {
+        const fi = f.files.find(fi => fi.id === fileId)
+        if (fi) { parentFolder = f; fileItem = fi; break }
+      }
+      if (!fileItem || !parentFolder) return s
 
       const folders = s.folders.map(f => ({
         ...f,
@@ -157,8 +190,55 @@ export function useStore() {
         s.activeFileId === fileId
           ? (allFiles[0]?.id ?? null)
           : s.activeFileId
-      return { folders, activeFileId }
+      const entry: TrashEntry = {
+        id: crypto.randomUUID(),
+        type: 'file',
+        payload: fileItem,
+        parentFolderId: parentFolder.id,
+        parentFolderName: parentFolder.name,
+        deletedAt: Date.now(),
+      }
+      return { ...s, folders, activeFileId, trash: [...s.trash, entry] }
     })
+  }, [])
+
+  const restoreFromTrash = useCallback((trashId: string) => {
+    setStore(s => {
+      const entry = s.trash.find(t => t.id === trashId)
+      if (!entry) return s
+      let folders = s.folders
+      let activeFileId = s.activeFileId
+      if (entry.type === 'folder') {
+        const folder = entry.payload as Folder
+        folders = [...s.folders, folder]
+        if (!activeFileId) activeFileId = folder.files[0]?.id ?? null
+      } else {
+        const file = entry.payload as FileItem
+        const targetFolder = s.folders.find(f => f.id === entry.parentFolderId)
+        if (targetFolder) {
+          folders = s.folders.map(f =>
+            f.id === entry.parentFolderId ? { ...f, files: [...f.files, file] } : f
+          )
+        } else {
+          // 元のフォルダが存在しない場合は同名の新フォルダを作成して復元
+          const restoredFolder: Folder = {
+            id: crypto.randomUUID(),
+            name: entry.parentFolderName ?? '復元したファイル',
+            files: [file],
+          }
+          folders = [...s.folders, restoredFolder]
+        }
+      }
+      return { ...s, folders, activeFileId, trash: s.trash.filter(t => t.id !== trashId) }
+    })
+  }, [])
+
+  const permanentlyDelete = useCallback((trashId: string) => {
+    setStore(s => ({ ...s, trash: s.trash.filter(t => t.id !== trashId) }))
+  }, [])
+
+  const emptyTrash = useCallback(() => {
+    setStore(s => ({ ...s, trash: [] }))
   }, [])
 
   const exportData = useCallback(() => {
@@ -225,7 +305,7 @@ export function useStore() {
         }
         const allFiles = folders.flatMap(f => f.files)
         const activeFileId = allFiles[0]?.id ?? null
-        setStore({ folders, activeFileId })
+        setStore(s => ({ ...s, folders, activeFileId }))
         onResult?.(true)
       } catch {
         onResult?.(false)
@@ -263,7 +343,7 @@ export function useStore() {
             updatedFolders[existingIdx] = { ...updatedFolders[existingIdx], files: updatedFiles }
           }
         }
-        return { folders: updatedFolders, activeFileId: newActiveFileId }
+        return { ...prev, folders: updatedFolders, activeFileId: newActiveFileId }
       }
 
       if (mode === 'rename') {
@@ -303,6 +383,9 @@ export function useStore() {
     renameFile,
     deleteFolder,
     deleteFile,
+    restoreFromTrash,
+    permanentlyDelete,
+    emptyTrash,
     exportData,
     exportFolder,
     exportFile,
