@@ -9,12 +9,18 @@ export type ShortcutConfig = {
   bulletList: ShortcutDef
   taskList: ShortcutDef
   link: ShortcutDef
+  textColor1: ShortcutDef
+  textColor2: ShortcutDef
+  textColor3: ShortcutDef
 }
 
 export const DEFAULT_SHORTCUTS: ShortcutConfig = {
   bulletList: { modifiers: ['Mod'], key: '.' },
   taskList:   { modifiers: ['Mod'], key: '/' },
   link:       { modifiers: ['Mod'], key: 'k' },
+  textColor1: { modifiers: ['Mod', 'Shift'], key: '1' },
+  textColor2: { modifiers: ['Mod', 'Shift'], key: '2' },
+  textColor3: { modifiers: ['Mod', 'Shift'], key: '3' },
 }
 
 export const SHORTCUTS_KEY = 'thinkspeed-shortcuts'
@@ -26,9 +32,12 @@ export function loadShortcutsFromStorage(): ShortcutConfig {
     const p = JSON.parse(raw) as Record<string, unknown>
     return {
       ...DEFAULT_SHORTCUTS,
-      ...(isValidDef(p.bulletList) && { bulletList: p.bulletList }),
-      ...(isValidDef(p.taskList)   && { taskList:   p.taskList }),
-      ...(isValidDef(p.link)       && { link:        p.link }),
+      ...(isValidDef(p.bulletList)  && { bulletList:  p.bulletList }),
+      ...(isValidDef(p.taskList)    && { taskList:    p.taskList }),
+      ...(isValidDef(p.link)        && { link:        p.link }),
+      ...(isValidDef(p.textColor1)  && { textColor1:  p.textColor1 }),
+      ...(isValidDef(p.textColor2)  && { textColor2:  p.textColor2 }),
+      ...(isValidDef(p.textColor3)  && { textColor3:  p.textColor3 }),
     }
   } catch {
     return { ...DEFAULT_SHORTCUTS }

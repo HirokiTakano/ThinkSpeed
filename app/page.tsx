@@ -5,8 +5,9 @@ import Sidebar from '@/components/Sidebar'
 import { useStore } from '@/hooks/useStore'
 import {
   LIGHT_COLORS_KEY, DARK_COLORS_KEY,
+  EMPHASIS_COLORS_KEY, DEFAULT_EMPHASIS_COLORS,
   DEFAULT_LIGHT_COLORS, DEFAULT_DARK_COLORS,
-  applyColorsToDOM, loadColorsFromStorage,
+  applyColorsToDOM, loadColorsFromStorage, loadEmphasisColorsFromStorage,
   type ColorConfig,
 } from '@/hooks/themes'
 import {
@@ -42,6 +43,7 @@ export default function Home() {
   const [lightColors, setLightColors] = useState<ColorConfig>(DEFAULT_LIGHT_COLORS)
   const [darkColors, setDarkColors] = useState<ColorConfig>(DEFAULT_DARK_COLORS)
   const [shortcuts, setShortcuts] = useState<ShortcutConfig>(DEFAULT_SHORTCUTS)
+  const [emphasisColors, setEmphasisColors] = useState<[string, string, string]>(DEFAULT_EMPHASIS_COLORS)
 
   // マウント時に保存済みテーマ・カラー・ショートカットを読み込んで適用
   useEffect(() => {
@@ -53,6 +55,7 @@ export default function Home() {
     setLightColors(light)
     setDarkColors(dark)
     setShortcuts(loadShortcutsFromStorage())
+    setEmphasisColors(loadEmphasisColorsFromStorage())
 
     document.documentElement.classList.toggle('dark', t === 'dark')
     applyColorsToDOM(light, dark)
@@ -92,6 +95,15 @@ export default function Home() {
     })
   }
 
+  const changeEmphasisColor = (index: number, color: string) => {
+    setEmphasisColors(prev => {
+      const next: [string, string, string] = [...prev] as [string, string, string]
+      next[index] = color
+      localStorage.setItem(EMPHASIS_COLORS_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--ts-bg-main)]">
       <Sidebar
@@ -119,9 +131,11 @@ export default function Home() {
         onChangeColor={changeColor}
         shortcuts={shortcuts}
         onChangeShortcut={changeShortcut}
+        emphasisColors={emphasisColors}
+        onChangeEmphasisColor={changeEmphasisColor}
       />
       <main className="flex-1 overflow-y-auto">
-        <Editor file={activeFile} onChange={updateFileContent} shortcuts={shortcuts} />
+        <Editor file={activeFile} onChange={updateFileContent} shortcuts={shortcuts} emphasisColors={emphasisColors} />
       </main>
     </div>
   )

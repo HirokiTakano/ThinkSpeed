@@ -39,6 +39,8 @@ type Props = {
   onChangeColor: (mode: 'light' | 'dark', key: keyof ColorConfig, value: string) => void
   shortcuts: ShortcutConfig
   onChangeShortcut: (action: keyof ShortcutConfig, def: ShortcutDef) => void
+  emphasisColors: [string, string, string]
+  onChangeEmphasisColor: (index: number, color: string) => void
 }
 
 function InlineEdit({
@@ -78,10 +80,14 @@ type RecordingTarget = keyof ShortcutConfig | null
 function HelpOverlay({
   shortcuts,
   onChangeShortcut,
+  emphasisColors,
+  onChangeEmphasisColor,
   onClose,
 }: {
   shortcuts: ShortcutConfig
   onChangeShortcut: (action: keyof ShortcutConfig, def: ShortcutDef) => void
+  emphasisColors: [string, string, string]
+  onChangeEmphasisColor: (index: number, color: string) => void
   onClose: () => void
 }) {
   const [recording, setRecording] = useState<RecordingTarget>(null)
@@ -144,7 +150,7 @@ function HelpOverlay({
       const otherActions = (Object.keys(shortcuts) as Array<keyof ShortcutConfig>).filter(k => k !== recording)
       const conflict = otherActions.find(k => defsConflict(shortcuts[k], newDef))
       if (conflict) {
-        const labels: Record<keyof ShortcutConfig, string> = { bulletList: '箇条書きトグル', taskList: 'チェックリストトグル', link: 'リンク設定' }
+        const labels: Record<keyof ShortcutConfig, string> = { bulletList: '箇条書きトグル', taskList: 'チェックリストトグル', link: 'リンク設定', textColor1: '文字色 1', textColor2: '文字色 2', textColor3: '文字色 3' }
         setError(`「${labels[conflict]}」と競合しています`)
         return
       }
@@ -157,10 +163,13 @@ function HelpOverlay({
     return () => document.removeEventListener('keydown', handler, { capture: true })
   }, [recording, shortcuts, onChangeShortcut])
 
-  const SHORTCUT_ROWS: { action: keyof ShortcutConfig; label: string; fixed?: boolean }[] = [
+  const SHORTCUT_ROWS: { action: keyof ShortcutConfig; label: string; colorIndex?: number }[] = [
     { action: 'bulletList', label: '箇条書きのオン / オフ' },
     { action: 'taskList',   label: 'チェックリストのオン / オフ' },
     { action: 'link',       label: 'リンクの設定 / 解除' },
+    { action: 'textColor1', label: '文字色 1', colorIndex: 0 },
+    { action: 'textColor2', label: '文字色 2', colorIndex: 1 },
+    { action: 'textColor3', label: '文字色 3', colorIndex: 2 },
   ]
   const FIXED_ROWS = [
     { key: 'Tab',       label: '一段深くインデント' },
@@ -282,6 +291,9 @@ function HelpOverlay({
                 onChangeShortcut('bulletList', DEFAULT_SHORTCUTS.bulletList)
                 onChangeShortcut('taskList',   DEFAULT_SHORTCUTS.taskList)
                 onChangeShortcut('link',       DEFAULT_SHORTCUTS.link)
+                onChangeShortcut('textColor1', DEFAULT_SHORTCUTS.textColor1)
+                onChangeShortcut('textColor2', DEFAULT_SHORTCUTS.textColor2)
+                onChangeShortcut('textColor3', DEFAULT_SHORTCUTS.textColor3)
               }}
               className="text-[10px] text-gray-400 hover:text-indigo-500 dark:text-zinc-600 dark:hover:text-indigo-400 transition-colors"
             >
@@ -302,7 +314,7 @@ function HelpOverlay({
 
           <div className="rounded-lg bg-white dark:bg-zinc-800/50 border border-gray-100 dark:border-zinc-700/50 overflow-hidden divide-y divide-gray-100 dark:divide-zinc-700/50">
             {/* カスタマイズ可能なショートカット */}
-            {SHORTCUT_ROWS.map(({ action, label }) => {
+            {SHORTCUT_ROWS.map(({ action, label, colorIndex }) => {
               const isRec = recording === action
               return (
                 <div key={action} className="flex items-center gap-3 px-4 py-3">
@@ -314,6 +326,20 @@ function HelpOverlay({
                     {isRec ? '…' : formatShortcutDef(shortcuts[action])}
                   </kbd>
                   <span className="text-xs text-gray-500 dark:text-zinc-400 flex-1">{label}</span>
+                  {colorIndex !== undefined && (
+                    <label
+                      title="色を変更"
+                      className="cursor-pointer shrink-0 w-5 h-5 rounded border border-black/15 dark:border-white/15 hover:scale-110 transition-transform block"
+                      style={{ backgroundColor: emphasisColors[colorIndex] }}
+                    >
+                      <input
+                        type="color"
+                        value={emphasisColors[colorIndex]}
+                        onChange={e => onChangeEmphasisColor(colorIndex, e.target.value)}
+                        className="sr-only"
+                      />
+                    </label>
+                  )}
                   <button
                     onClick={() => {
                       setError(null)
@@ -1158,6 +1184,8 @@ export default function Sidebar({
   onChangeColor,
   shortcuts,
   onChangeShortcut,
+  emphasisColors,
+  onChangeEmphasisColor,
 }: Props) {
   const [closedFolders, setClosedFolders] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<{
@@ -1528,6 +1556,8 @@ export default function Sidebar({
       <HelpOverlay
         shortcuts={shortcuts}
         onChangeShortcut={onChangeShortcut}
+        emphasisColors={emphasisColors}
+        onChangeEmphasisColor={onChangeEmphasisColor}
         onClose={() => setShowHelp(false)}
       />
     )}
