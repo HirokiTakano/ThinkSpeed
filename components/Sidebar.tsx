@@ -141,7 +141,7 @@ function HelpOverlay({
       const otherActions = (Object.keys(shortcuts) as Array<keyof ShortcutConfig>).filter(k => k !== recording)
       const conflict = otherActions.find(k => defsConflict(shortcuts[k], newDef))
       if (conflict) {
-        const labels: Record<keyof ShortcutConfig, string> = { bulletList: '箇条書きトグル', link: 'リンク設定' }
+        const labels: Record<keyof ShortcutConfig, string> = { bulletList: '箇条書きトグル', orderedList: '番号付きリストトグル', taskList: 'チェックリストトグル', link: 'リンク設定' }
         setError(`「${labels[conflict]}」と競合しています`)
         return
       }
@@ -155,8 +155,10 @@ function HelpOverlay({
   }, [recording, shortcuts, onChangeShortcut])
 
   const SHORTCUT_ROWS: { action: keyof ShortcutConfig; label: string; fixed?: boolean }[] = [
-    { action: 'bulletList', label: '箇条書きのオン / オフ' },
-    { action: 'link',       label: 'リンクの設定 / 解除' },
+    { action: 'bulletList',  label: '箇条書きのオン / オフ' },
+    { action: 'orderedList', label: '番号付きリストのオン / オフ' },
+    { action: 'taskList',    label: 'チェックリストのオン / オフ' },
+    { action: 'link',        label: 'リンクの設定 / 解除' },
   ]
   const FIXED_ROWS = [
     { key: 'Tab',       label: '一段深くインデント' },
@@ -275,8 +277,10 @@ function HelpOverlay({
             <h3 className="text-[10px] font-bold text-gray-400 dark:text-zinc-600 uppercase tracking-widest">キーボードショートカット</h3>
             <button
               onClick={() => {
-                onChangeShortcut('bulletList', DEFAULT_SHORTCUTS.bulletList)
-                onChangeShortcut('link', DEFAULT_SHORTCUTS.link)
+                onChangeShortcut('bulletList',  DEFAULT_SHORTCUTS.bulletList)
+                onChangeShortcut('orderedList', DEFAULT_SHORTCUTS.orderedList)
+                onChangeShortcut('taskList',    DEFAULT_SHORTCUTS.taskList)
+                onChangeShortcut('link',        DEFAULT_SHORTCUTS.link)
               }}
               className="text-[10px] text-gray-400 hover:text-indigo-500 dark:text-zinc-600 dark:hover:text-indigo-400 transition-colors"
             >

@@ -7,12 +7,16 @@ export type ShortcutDef = {
 
 export type ShortcutConfig = {
   bulletList: ShortcutDef
+  orderedList: ShortcutDef
+  taskList: ShortcutDef
   link: ShortcutDef
 }
 
 export const DEFAULT_SHORTCUTS: ShortcutConfig = {
-  bulletList: { modifiers: ['Mod'], key: '.' },
-  link:       { modifiers: ['Mod'], key: 'k' },
+  bulletList:  { modifiers: ['Mod'], key: '.' },
+  orderedList: { modifiers: ['Mod'], key: ',' },
+  taskList:    { modifiers: ['Mod'], key: '/' },
+  link:        { modifiers: ['Mod'], key: 'k' },
 }
 
 export const SHORTCUTS_KEY = 'thinkspeed-shortcuts'
@@ -23,8 +27,10 @@ export function loadShortcutsFromStorage(): ShortcutConfig {
     if (!raw) return DEFAULT_SHORTCUTS
     const p = JSON.parse(raw)
     return {
-      bulletList: isValidDef(p.bulletList) ? p.bulletList : DEFAULT_SHORTCUTS.bulletList,
-      link:       isValidDef(p.link)       ? p.link       : DEFAULT_SHORTCUTS.link,
+      bulletList:  isValidDef(p.bulletList)  ? p.bulletList  : DEFAULT_SHORTCUTS.bulletList,
+      orderedList: isValidDef(p.orderedList) ? p.orderedList : DEFAULT_SHORTCUTS.orderedList,
+      taskList:    isValidDef(p.taskList)    ? p.taskList    : DEFAULT_SHORTCUTS.taskList,
+      link:        isValidDef(p.link)        ? p.link        : DEFAULT_SHORTCUTS.link,
     }
   } catch {
     return DEFAULT_SHORTCUTS
