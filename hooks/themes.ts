@@ -21,6 +21,29 @@ export const DEFAULT_DARK_COLORS: ColorConfig = {
 
 export const LIGHT_COLORS_KEY = 'thinkspeed-light-colors'
 export const DARK_COLORS_KEY = 'thinkspeed-dark-colors'
+export const EMPHASIS_COLORS_KEY = 'thinkspeed-emphasis-colors'
+export const DEFAULT_EMPHASIS_COLORS: [string, string, string] = ['#ef4444', '#3b82f6', '#22c55e']
+
+export const EMPHASIS_COLOR_SWATCHES = [
+  '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6',
+  '#ec4899', '#f43f5e', '#14b8a6', '#a855f7', '#06b6d4', '#84cc16',
+]
+
+export function loadEmphasisColorsFromStorage(): [string, string, string] {
+  try {
+    const raw = localStorage.getItem(EMPHASIS_COLORS_KEY)
+    if (!raw) return [...DEFAULT_EMPHASIS_COLORS]
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return [...DEFAULT_EMPHASIS_COLORS]
+    return [
+      typeof parsed[0] === 'string' ? parsed[0] : DEFAULT_EMPHASIS_COLORS[0],
+      typeof parsed[1] === 'string' ? parsed[1] : DEFAULT_EMPHASIS_COLORS[1],
+      typeof parsed[2] === 'string' ? parsed[2] : DEFAULT_EMPHASIS_COLORS[2],
+    ]
+  } catch {
+    return [...DEFAULT_EMPHASIS_COLORS]
+  }
+}
 
 export function applyColorsToDOM(lightColors: ColorConfig, darkColors: ColorConfig) {
   const el = document.documentElement

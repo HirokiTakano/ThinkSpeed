@@ -10,6 +10,7 @@ import Image from '@tiptap/extension-image'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Extension } from '@tiptap/core'
+import { TextStyle, Color } from '@tiptap/extension-text-style'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FileItem } from '@/hooks/useStore'
 import { matchesEvent, type ShortcutConfig } from '@/hooks/shortcuts'
@@ -185,15 +186,19 @@ type Props = {
   file: FileItem | null
   onChange: (fileId: string, content: JSONContent) => void
   shortcuts: ShortcutConfig
+  emphasisColors: [string, string, string]
 }
 
-export default function Editor({ file, onChange, shortcuts }: Props) {
+export default function Editor({ file, onChange, shortcuts, emphasisColors }: Props) {
   const [copied, setCopied] = useState(false)
   // 現在表示中のファイルIDを追跡（ファイル切替時の誤保存防止）
   const activeFileIdRef = useRef<string | null>(null)
   // 常に最新のショートカット設定を参照できるよう ref で保持
   const shortcutsRef = useRef<ShortcutConfig>(shortcuts)
   useEffect(() => { shortcutsRef.current = shortcuts }, [shortcuts])
+  // emphasisColors が変わっても常に最新値を参照できるよう ref で保持
+  const emphasisColorsRef = useRef<[string, string, string]>(emphasisColors)
+  useEffect(() => { emphasisColorsRef.current = emphasisColors }, [emphasisColors])
   // editor インスタンスへの参照（handleKeyDown 内から commands を呼ぶため）
   const editorRef = useRef<TiptapEditor | null>(null)
 
@@ -226,6 +231,8 @@ export default function Editor({ file, onChange, shortcuts }: Props) {
       }),
       TaskList,
       TaskItem.configure({ nested: true }),
+      TextStyle,
+      Color,
       DeepIndent,
       Placeholder.configure({ placeholder: '思考を書き始めよう...' }),
     ],
@@ -266,6 +273,19 @@ export default function Editor({ file, onChange, shortcuts }: Props) {
           } catch {
             return false
           }
+        }
+        if (matchesEvent(e, sc.textColor1) || matchesEvent(e, sc.textColor2) || matchesEvent(e, sc.textColor3)) {
+          e.preventDefault()
+          const { from, to } = ed.state.selection
+          if (from === to) return false
+          const colorIndex = matchesEvent(e, sc.textColor1) ? 0 : matchesEvent(e, sc.textColor2) ? 1 : 2
+          const color = emphasisColorsRef.current[colorIndex]
+          if (ed.isActive('textStyle', { color })) {
+            ed.commands.unsetColor()
+          } else {
+            ed.commands.setColor(color)
+          }
+          return true
         }
         return false
       },
