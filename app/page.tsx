@@ -30,7 +30,9 @@ export default function Home() {
     deleteFolder,
     deleteFile,
     exportData,
-    importData,
+    exportFolder,
+    exportFile,
+    applyImport,
   } = useStore()
 
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
@@ -100,7 +102,9 @@ export default function Home() {
         onDeleteFolder={deleteFolder}
         onDeleteFile={deleteFile}
         onExport={exportData}
-        onImport={importData}
+        onExportFolder={exportFolder}
+        onExportFile={exportFile}
+        onApplyImport={applyImport}
         theme={theme}
         onToggleTheme={toggleTheme}
         lightColors={lightColors}

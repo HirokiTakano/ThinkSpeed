@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react'
 import type { Folder } from '@/hooks/useStore'
+import type { ImportMode } from '@/hooks/useStore'
 import CalendarOverlay from '@/components/CalendarOverlay'
 import {
   BG_LIGHT_SWATCHES, BG_DARK_SWATCHES,
@@ -25,7 +26,9 @@ type Props = {
   onDeleteFolder: (id: string) => void
   onDeleteFile: (id: string) => void
   onExport: () => void
-  onImport: (file: File) => void
+  onExportFolder: (folderId: string) => void
+  onExportFile: (fileId: string) => void
+  onApplyImport: (folders: Folder[], mode: ImportMode) => void
   theme: 'light' | 'dark'
   onToggleTheme: () => void
   lightColors: ColorConfig
@@ -81,22 +84,30 @@ function HelpOverlay({
   const [recording, setRecording] = useState<RecordingTarget>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Esc でオーバーレイを閉じる（録音中は中断のみ）
+  // Esc でオーバーレイを閉じる（録音中は中断のみ）— capture で録音ハンドラより先に処理
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (recording) { setRecording(null); setError(null) }
-        else onClose()
+        if (recording) {
+          e.stopImmediatePropagation()
+          setRecording(null)
+          setError(null)
+        } else {
+          onClose()
+        }
       }
     }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
+    document.addEventListener('keydown', handler, { capture: true })
+    return () => document.removeEventListener('keydown', handler, { capture: true })
   }, [onClose, recording])
 
   // キー録音ハンドラ（capture フェーズ: エディタより先に受け取る）
   useEffect(() => {
     if (!recording) return
     const handler = (e: KeyboardEvent) => {
+      // Esc は上の Esc ハンドラに任せる
+      if (e.key === 'Escape') return
+
       e.preventDefault()
       e.stopPropagation()
 
@@ -643,6 +654,323 @@ function AppearanceOverlay({
   )
 }
 
+function DataManagementOverlay({
+  folders,
+  onExportAll,
+  onExportFolder,
+  onExportFile,
+  onApplyImport,
+  onClose,
+}: {
+  folders: Folder[]
+  onExportAll: () => void
+  onExportFolder: (id: string) => void
+  onExportFile: (id: string) => void
+  onApplyImport: (folders: Folder[], mode: ImportMode) => void
+  onClose: () => void
+}) {
+  type ImportStep = 'idle' | 'select-mode' | 'confirm-overwrite'
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [exportedIds, setExportedIds] = useState<Set<string>>(new Set())
+  const [importStep, setImportStep] = useState<ImportStep>('idle')
+  const [pendingFolders, setPendingFolders] = useState<Folder[] | null>(null)
+  const [importMode, setImportMode] = useState<ImportMode>('rename')
+  const [importFeedback, setImportFeedback] = useState<'idle' | 'ok' | 'err'>('idle')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler, { capture: true })
+    return () => document.removeEventListener('keydown', handler, { capture: true })
+  }, [onClose])
+
+  const flashExport = (id: string) => {
+    setExportedIds(prev => new Set(prev).add(id))
+    setTimeout(() => setExportedIds(prev => { const next = new Set(prev); next.delete(id); return next }), 1500)
+  }
+
+  const handleExportAll = () => { onExportAll(); flashExport('__all__') }
+  const handleExportFolder = (id: string) => { onExportFolder(id); flashExport(id) }
+  const handleExportFile = (id: string) => { onExportFile(id); flashExport(id) }
+
+  const toggleExpand = (id: string) => {
+    setExpandedFolders(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const json = JSON.parse(ev.target?.result as string)
+        const parsed: Folder[] = Array.isArray(json) ? json : json.folders
+        if (!Array.isArray(parsed) || parsed.length === 0) throw new Error()
+        for (const f of parsed) {
+          if (typeof f.id !== 'string' || !Array.isArray(f.files)) throw new Error()
+          for (const fi of f.files) {
+            if (typeof fi.id !== 'string' || typeof fi.name !== 'string') throw new Error()
+          }
+        }
+        setPendingFolders(parsed)
+        setImportStep('select-mode')
+      } catch {
+        setImportFeedback('err')
+        setTimeout(() => setImportFeedback('idle'), 2500)
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  const executeImport = () => {
+    if (!pendingFolders) return
+    onApplyImport(pendingFolders, importMode)
+    setPendingFolders(null)
+    setImportStep('idle')
+    setImportFeedback('ok')
+    setTimeout(() => setImportFeedback('idle'), 2500)
+  }
+
+  const cancelImport = () => {
+    setPendingFolders(null)
+    setImportStep('idle')
+  }
+
+  const MODE_INFO: { mode: ImportMode; label: string; desc: string }[] = [
+    {
+      mode: 'rename',
+      label: '新規追加',
+      desc: 'バックアップの内容を新しく追加します。同じ名前のフォルダ・ファイルがある場合は、自動で「フォルダ名 (2)」のように別名を付けます。既存のデータは変わりません。',
+    },
+    {
+      mode: 'overwrite',
+      label: '同名を上書き',
+      desc: '同じ名前のフォルダ・ファイルがある場合、その内容をバックアップで置き換えます。名前が一致しないものはそのまま残ります。',
+    },
+  ]
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[var(--ts-bg-main)] flex flex-col help-overlay-enter">
+      <header className="flex-none flex items-center justify-between px-6 py-4 ts-bg-main-alpha backdrop-blur-md border-b border-gray-200 dark:border-zinc-800">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-zinc-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          戻る
+        </button>
+        <div className="flex items-center gap-1.5">
+          <span className="text-indigo-500">✦</span>
+          <span className="text-sm font-semibold text-gray-700 dark:text-zinc-200">データ管理</span>
+        </div>
+        <div className="w-14" />
+      </header>
+
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="max-w-xl mx-auto px-6 py-8 space-y-10">
+
+          {/* ── バックアップ ── */}
+          <section className="space-y-4">
+            <div>
+              <h2 className="text-base font-semibold text-gray-700 dark:text-zinc-200 mb-1">💾 バックアップ</h2>
+              <p className="text-sm text-gray-400 dark:text-zinc-500">ノートをパソコンにファイルとして保存します。定期的なバックアップをおすすめします。</p>
+            </div>
+
+            {/* 全データ */}
+            <button
+              onClick={handleExportAll}
+              className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${
+                exportedIds.has('__all__')
+                  ? 'border-emerald-300 bg-emerald-50 text-emerald-600 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                  : 'border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-400 dark:hover:bg-indigo-950/50'
+              }`}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              {exportedIds.has('__all__') ? '✓ 保存しました！' : 'すべてのデータをまとめて保存'}
+            </button>
+
+            {/* フォルダ / ファイル別 */}
+            <div className="space-y-1.5">
+              <p className="text-xs text-gray-400 dark:text-zinc-600">フォルダ・ファイルごとに保存</p>
+              <div className="rounded-xl border border-gray-100 dark:border-zinc-700/50 overflow-hidden bg-white dark:bg-zinc-800/50">
+                {folders.map((folder, fi) => {
+                  const expanded = expandedFolders.has(folder.id)
+                  return (
+                    <div key={folder.id} className={fi > 0 ? 'border-t border-gray-100 dark:border-zinc-700/50' : ''}>
+                      <div className="flex items-center gap-2 px-4 py-2.5">
+                        <button
+                          onClick={() => toggleExpand(folder.id)}
+                          className="flex-1 flex items-center gap-2 text-left min-w-0"
+                        >
+                          <svg className={`w-3.5 h-3.5 shrink-0 text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="m9 18 6-6-6-6" />
+                          </svg>
+                          <span className="text-sm">📁</span>
+                          <span className="text-xs text-gray-600 dark:text-zinc-300 truncate">{folder.name}</span>
+                          <span className="text-[10px] text-gray-300 dark:text-zinc-700 shrink-0">{folder.files.length}件</span>
+                        </button>
+                        <button
+                          onClick={() => handleExportFolder(folder.id)}
+                          className={`shrink-0 text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                            exportedIds.has(folder.id)
+                              ? 'border-emerald-300 text-emerald-600 bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:bg-emerald-950/40'
+                              : 'border-gray-200 dark:border-zinc-700 text-gray-400 dark:text-zinc-500 hover:border-indigo-300 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:border-indigo-700 dark:hover:text-indigo-400 dark:hover:bg-indigo-950/30'
+                          }`}
+                        >
+                          {exportedIds.has(folder.id) ? '✓' : '保存'}
+                        </button>
+                      </div>
+                      {expanded && folder.files.map(file => (
+                        <div key={file.id} className="flex items-center gap-2 pl-10 pr-4 py-2 bg-gray-50/70 dark:bg-zinc-900/40 border-t border-gray-100 dark:border-zinc-700/50">
+                          <span className="text-sm shrink-0">📄</span>
+                          <span className="flex-1 text-xs text-gray-500 dark:text-zinc-400 truncate">{file.name}</span>
+                          <button
+                            onClick={() => handleExportFile(file.id)}
+                            className={`shrink-0 text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                              exportedIds.has(file.id)
+                                ? 'border-emerald-300 text-emerald-600 bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:bg-emerald-950/40'
+                                : 'border-gray-200 dark:border-zinc-700 text-gray-400 dark:text-zinc-500 hover:border-indigo-300 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:border-indigo-700 dark:hover:text-indigo-400 dark:hover:bg-indigo-950/30'
+                            }`}
+                          >
+                            {exportedIds.has(file.id) ? '✓' : '保存'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </section>
+
+          {/* ── 取り込み ── */}
+          <section className="space-y-4">
+            <div>
+              <h2 className="text-base font-semibold text-gray-700 dark:text-zinc-200 mb-1">📥 取り込み</h2>
+              <p className="text-sm text-gray-400 dark:text-zinc-500">以前に保存したバックアップファイルからノートを取り込みます。</p>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+
+            {/* Step 1: ファイル選択 */}
+            {importStep === 'idle' && (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${
+                  importFeedback === 'ok'
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-600 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                    : importFeedback === 'err'
+                    ? 'border-red-300 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400'
+                    : 'border-gray-200 dark:border-zinc-700 text-gray-500 dark:text-zinc-400 hover:border-indigo-300 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:border-indigo-700 dark:hover:text-indigo-400 dark:hover:bg-indigo-950/30'
+                }`}
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 5 17 10" />
+                  <line x1="12" y1="5" x2="12" y2="15" />
+                </svg>
+                {importFeedback === 'ok' ? '✓ 取り込みました！' : importFeedback === 'err' ? '❌ 読み込みに失敗しました' : 'バックアップファイルを選ぶ'}
+              </button>
+            )}
+
+            {/* Step 2: 取り込み方法の選択 */}
+            {importStep === 'select-mode' && pendingFolders && (
+              <div className="space-y-4">
+                <div className="rounded-xl bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-800/40 px-4 py-3">
+                  <p className="text-sm text-indigo-600 dark:text-indigo-400">
+                    📦 {pendingFolders.length}個のフォルダ、{pendingFolders.reduce((sum, f) => sum + f.files.length, 0)}個のファイルが見つかりました
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-gray-500 dark:text-zinc-400">取り込み方法を選んでください</p>
+                  {MODE_INFO.map(({ mode, label, desc }) => (
+                    <button
+                      key={mode}
+                      onClick={() => setImportMode(mode)}
+                      className={`w-full flex items-start gap-3 p-3.5 rounded-xl border text-left transition-colors ${
+                        importMode === mode
+                          ? 'border-indigo-300 bg-indigo-50 dark:border-indigo-600 dark:bg-indigo-950/30'
+                          : 'border-gray-200 dark:border-zinc-700 hover:border-gray-300 dark:hover:border-zinc-600'
+                      }`}
+                    >
+                      <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-none flex items-center justify-center ${
+                        importMode === mode ? 'border-indigo-500 bg-indigo-500' : 'border-gray-300 dark:border-zinc-600'
+                      }`}>
+                        {importMode === mode && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 dark:text-zinc-200">{label}</p>
+                        <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5 leading-relaxed">{desc}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={cancelImport}
+                    className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-zinc-700 text-sm text-gray-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={() => importMode === 'overwrite' ? setImportStep('confirm-overwrite') : executeImport()}
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium transition-colors"
+                  >
+                    取り込む →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: 上書き確認 */}
+            {importStep === 'confirm-overwrite' && (
+              <div className="space-y-4">
+                <div className="rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40 px-4 py-4 space-y-2">
+                  <p className="text-sm font-semibold text-red-700 dark:text-red-400">⚠️ 上書きの確認</p>
+                  <p className="text-sm text-red-600 dark:text-red-400 leading-relaxed">
+                    同じ名前のフォルダ・ファイルが見つかった場合、既存のデータが<strong>完全に失われ</strong>、バックアップの内容で置き換えられます。
+                  </p>
+                  <p className="text-sm text-red-600 dark:text-red-400">この操作は元に戻せません。続けますか？</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setImportStep('select-mode')}
+                    className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-zinc-700 text-sm text-gray-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    ← 戻る
+                  </button>
+                  <button
+                    onClick={executeImport}
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors"
+                  >
+                    上書きして取り込む
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Sidebar({
   folders,
   activeFileId,
@@ -654,7 +982,9 @@ export default function Sidebar({
   onDeleteFolder,
   onDeleteFile,
   onExport,
-  onImport,
+  onExportFolder,
+  onExportFile,
+  onApplyImport,
   theme,
   onToggleTheme,
   lightColors,
@@ -668,12 +998,11 @@ export default function Sidebar({
     id: string
     type: 'folder' | 'file'
   } | null>(null)
-  const [importFeedback, setImportFeedback] = useState<'idle' | 'ok' | 'err'>('idle')
   const [showHelp, setShowHelp] = useState(false)
   const [showAppearance, setShowAppearance] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
   const [showPatchNotes, setShowPatchNotes] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [showDataMgmt, setShowDataMgmt] = useState(false)
 
   // カレンダーからファイルを選ぶとき、親フォルダを自動展開する
   const selectAndRevealFile = useCallback((fileId: string) => {
@@ -696,20 +1025,6 @@ export default function Sidebar({
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
-  }
-
-  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    // reset input so same file can be re-selected
-    e.target.value = ''
-    try {
-      onImport(file)
-      setImportFeedback('ok')
-    } catch {
-      setImportFeedback('err')
-    }
-    setTimeout(() => setImportFeedback('idle'), 2000)
   }
 
   return (
@@ -907,44 +1222,23 @@ export default function Sidebar({
         })}
       </div>
 
-      {/* エクスポート / インポート */}
-      <div className="px-4 py-3 border-t border-gray-200/80 dark:border-zinc-800/80 space-y-1.5">
-        {/* hidden file input */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json,application/json"
-          className="hidden"
-          onChange={handleImportFile}
-        />
-        <p className="text-[10px] font-medium text-gray-400 dark:text-zinc-600 uppercase tracking-wide mb-1.5">データ管理</p>
+      {/* データ管理 */}
+      <div className="border-t border-gray-200/80 dark:border-zinc-800/80">
         <button
-          onClick={onExport}
-          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:text-zinc-400 dark:hover:text-indigo-300 dark:hover:bg-indigo-950/50 transition-colors"
+          onClick={() => setShowDataMgmt(true)}
+          className="w-full flex items-center justify-between px-4 py-2.5 text-[10px] font-medium text-gray-400 dark:text-zinc-600 uppercase tracking-wide hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors group"
         >
-          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
+          <span className="flex items-center gap-1.5">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            データ管理
+          </span>
+          <svg className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="9 18 15 12 9 6" />
           </svg>
-          JSONでエクスポート
-        </button>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] transition-colors
-            ${importFeedback === 'ok'
-              ? 'text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/40'
-              : importFeedback === 'err'
-              ? 'text-red-500 bg-red-50 dark:text-red-400 dark:bg-red-950/40'
-              : 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:text-zinc-400 dark:hover:text-indigo-300 dark:hover:bg-indigo-950/50'
-            }`}
-        >
-          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 5 17 10" />
-            <line x1="12" y1="5" x2="12" y2="15" />
-          </svg>
-          {importFeedback === 'ok' ? 'インポート完了!' : importFeedback === 'err' ? '読み込み失敗' : 'JSONをインポート'}
         </button>
       </div>
 
@@ -1056,6 +1350,16 @@ export default function Sidebar({
     )}
     {showPatchNotes && (
       <PatchNotesOverlay onClose={() => setShowPatchNotes(false)} />
+    )}
+    {showDataMgmt && (
+      <DataManagementOverlay
+        folders={folders}
+        onExportAll={onExport}
+        onExportFolder={onExportFolder}
+        onExportFile={onExportFile}
+        onApplyImport={onApplyImport}
+        onClose={() => setShowDataMgmt(false)}
+      />
     )}
     </>
   )

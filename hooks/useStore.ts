@@ -5,6 +5,7 @@ import type { JSONContent } from '@tiptap/react'
 
 export type FileItem = { id: string; name: string; content: JSONContent; createdOn?: string }
 export type Folder = { id: string; name: string; files: FileItem[] }
+export type ImportMode = 'overwrite' | 'rename'
 
 type Store = { folders: Folder[]; activeFileId: string | null }
 
@@ -170,12 +171,44 @@ export function useStore() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `thinkspeed-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `ThinkSpeed_全データ_${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
   }, [store.folders])
 
-  const importData = useCallback((file: File) => {
+  const exportFolder = useCallback((folderId: string) => {
+    const folder = store.folders.find(f => f.id === folderId)
+    if (!folder) return
+    const payload = { version: 1, exportedAt: new Date().toISOString(), folders: [folder] }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const safeName = folder.name.replace(/[^\w\u3040-\u9fff]/g, '_')
+    a.download = `ThinkSpeed_フォルダ_${safeName}_${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [store.folders])
+
+  const exportFile = useCallback((fileId: string) => {
+    for (const folder of store.folders) {
+      const file = folder.files.find(f => f.id === fileId)
+      if (file) {
+        const payload = { version: 1, exportedAt: new Date().toISOString(), folders: [{ ...folder, files: [file] }] }
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        const safeName = file.name.replace(/[^\w\u3040-\u9fff]/g, '_')
+        a.download = `ThinkSpeed_ファイル_${safeName}_${new Date().toISOString().slice(0, 10)}.json`
+        a.click()
+        URL.revokeObjectURL(url)
+        return
+      }
+    }
+  }, [store.folders])
+
+  const importData = useCallback((file: File, onResult?: (ok: boolean) => void) => {
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
@@ -186,15 +219,77 @@ export function useStore() {
         // 最低限のバリデーション
         for (const f of folders) {
           if (typeof f.id !== 'string' || !Array.isArray(f.files)) throw new Error('Invalid')
+          for (const fi of f.files) {
+            if (typeof fi.id !== 'string' || typeof fi.name !== 'string') throw new Error('Invalid')
+          }
         }
         const allFiles = folders.flatMap(f => f.files)
         const activeFileId = allFiles[0]?.id ?? null
         setStore({ folders, activeFileId })
+        onResult?.(true)
       } catch {
-        alert('JSONファイルの読み込みに失敗しました。\nThinkSpeed の正しいバックアップファイルか確認してください。')
+        onResult?.(false)
       }
     }
     reader.readAsText(file)
+  }, [])
+
+  const applyImport = useCallback((importedFolders: Folder[], mode: ImportMode) => {
+    setStore(prev => {
+      if (mode === 'overwrite') {
+        const updatedFolders = [...prev.folders]
+        let newActiveFileId = prev.activeFileId
+        for (const importedFolder of importedFolders) {
+          const existingIdx = updatedFolders.findIndex(f => f.name === importedFolder.name)
+          if (existingIdx === -1) {
+            updatedFolders.push({
+              ...importedFolder,
+              id: crypto.randomUUID(),
+              files: importedFolder.files.map(fi => ({ ...fi, id: crypto.randomUUID() })),
+            })
+          } else {
+            const updatedFiles = [...updatedFolders[existingIdx].files]
+            for (const importedFile of importedFolder.files) {
+              const fileIdx = updatedFiles.findIndex(f => f.name === importedFile.name)
+              if (fileIdx === -1) {
+                updatedFiles.push({ ...importedFile, id: crypto.randomUUID() })
+              } else {
+                // 新しいIDを生成してエディタに変更を通知する
+                const newId = crypto.randomUUID()
+                if (updatedFiles[fileIdx].id === prev.activeFileId) newActiveFileId = newId
+                updatedFiles[fileIdx] = { ...importedFile, id: newId }
+              }
+            }
+            updatedFolders[existingIdx] = { ...updatedFolders[existingIdx], files: updatedFiles }
+          }
+        }
+        return { folders: updatedFolders, activeFileId: newActiveFileId }
+      }
+
+      if (mode === 'rename') {
+        // フォルダ名が衝突する場合は「フォルダ名 (2)」のように別名で追加
+        const updatedFolders = [...prev.folders]
+        const existingFolderNames = new Set(updatedFolders.map(f => f.name))
+        for (const importedFolder of importedFolders) {
+          let newFolderName = importedFolder.name
+          if (existingFolderNames.has(newFolderName)) {
+            let counter = 2
+            while (existingFolderNames.has(`${importedFolder.name} (${counter})`)) counter++
+            newFolderName = `${importedFolder.name} (${counter})`
+          }
+          existingFolderNames.add(newFolderName)
+          updatedFolders.push({
+            ...importedFolder,
+            id: crypto.randomUUID(),
+            name: newFolderName,
+            files: importedFolder.files.map(fi => ({ ...fi, id: crypto.randomUUID() })),
+          })
+        }
+        return { ...prev, folders: updatedFolders }
+      }
+
+      return prev
+    })
   }, [])
 
   return {
@@ -209,6 +304,9 @@ export function useStore() {
     deleteFolder,
     deleteFile,
     exportData,
+    exportFolder,
+    exportFile,
     importData,
+    applyImport,
   }
 }
