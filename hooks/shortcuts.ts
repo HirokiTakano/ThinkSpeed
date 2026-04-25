@@ -24,16 +24,17 @@ export const SHORTCUTS_KEY = 'thinkspeed-shortcuts'
 export function loadShortcutsFromStorage(): ShortcutConfig {
   try {
     const raw = localStorage.getItem(SHORTCUTS_KEY)
-    if (!raw) return DEFAULT_SHORTCUTS
-    const p = JSON.parse(raw)
+    if (!raw) return { ...DEFAULT_SHORTCUTS }
+    const p = JSON.parse(raw) as Record<string, unknown>
     return {
-      bulletList:  isValidDef(p.bulletList)  ? p.bulletList  : DEFAULT_SHORTCUTS.bulletList,
-      orderedList: isValidDef(p.orderedList) ? p.orderedList : DEFAULT_SHORTCUTS.orderedList,
-      taskList:    isValidDef(p.taskList)    ? p.taskList    : DEFAULT_SHORTCUTS.taskList,
-      link:        isValidDef(p.link)        ? p.link        : DEFAULT_SHORTCUTS.link,
+      ...DEFAULT_SHORTCUTS,
+      ...(isValidDef(p.bulletList)  && { bulletList:  p.bulletList }),
+      ...(isValidDef(p.orderedList) && { orderedList: p.orderedList }),
+      ...(isValidDef(p.taskList)    && { taskList:    p.taskList }),
+      ...(isValidDef(p.link)        && { link:        p.link }),
     }
   } catch {
-    return DEFAULT_SHORTCUTS
+    return { ...DEFAULT_SHORTCUTS }
   }
 }
 
@@ -44,8 +45,8 @@ function isValidDef(d: unknown): d is ShortcutDef {
 }
 
 /** KeyboardEvent がショートカット定義に一致するか判定 */
-export function matchesEvent(e: KeyboardEvent, def: ShortcutDef): boolean {
-  if (e.isComposing || e.repeat) return false
+export function matchesEvent(e: KeyboardEvent, def: ShortcutDef | undefined): boolean {
+  if (!def || e.isComposing || e.repeat) return false
   const wantMod   = def.modifiers.includes('Mod')
   const wantShift = def.modifiers.includes('Shift')
   const wantAlt   = def.modifiers.includes('Alt')
