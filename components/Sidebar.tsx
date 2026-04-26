@@ -404,6 +404,48 @@ function PatchNotesOverlay({ onClose }: { onClose: () => void }) {
 
   const RELEASES = [
     {
+      version: 'v0.7',
+      date: '2026年4月',
+      label: '文字色カスタマイズ',
+      color: 'amber',
+      items: [
+        { icon: '🎨', text: 'エディタの文字色を3パターンから選べるようになりました' },
+        { icon: '🌗', text: 'ライト・ダークそれぞれで独立して設定できます' },
+      ],
+    },
+    {
+      version: 'v0.6',
+      date: '2026年4月',
+      label: 'ゴミ箱機能',
+      color: 'rose',
+      items: [
+        { icon: '🗑️', text: '削除したファイル・フォルダはゴミ箱に移動するようになりました' },
+        { icon: '♻️', text: 'ゴミ箱から復元・完全削除が可能です' },
+        { icon: '⏱️', text: '30日後に自動的に完全削除されます' },
+      ],
+    },
+    {
+      version: 'v0.5',
+      date: '2026年4月',
+      label: 'チェックリスト',
+      color: 'teal',
+      items: [
+        { icon: '☑️', text: 'チェックリストを追加（Ctrl/Cmd + /）' },
+        { icon: '✅', text: '箇条書きと同じスタイルに統一されたチェックボックス' },
+      ],
+    },
+    {
+      version: 'v0.4',
+      date: '2026年4月',
+      label: 'エクスポート強化',
+      color: 'sky',
+      items: [
+        { icon: '📁', text: 'フォルダ単位・ファイル単位でのエクスポートに対応' },
+        { icon: '🔄', text: 'インポート時に同名ファイルを自動リネームして競合を回避' },
+        { icon: '📄', text: 'エクスポートファイル名が日本語対応の読みやすい形式に変更' },
+      ],
+    },
+    {
       version: 'v0.3',
       date: '2025年4月',
       label: '画像サポート',
@@ -447,6 +489,26 @@ function PatchNotesOverlay({ onClose }: { onClose: () => void }) {
   ] as const
 
   const colorMap = {
+    amber: {
+      badge: 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+      dot: 'bg-amber-400',
+      line: 'border-amber-200 dark:border-amber-800/60',
+    },
+    rose: {
+      badge: 'bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+      dot: 'bg-rose-400',
+      line: 'border-rose-200 dark:border-rose-800/60',
+    },
+    teal: {
+      badge: 'bg-teal-100 dark:bg-teal-950/50 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800',
+      dot: 'bg-teal-400',
+      line: 'border-teal-200 dark:border-teal-800/60',
+    },
+    sky: {
+      badge: 'bg-sky-100 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800',
+      dot: 'bg-sky-400',
+      line: 'border-sky-200 dark:border-sky-800/60',
+    },
     emerald: {
       badge: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
       dot: 'bg-emerald-400',
