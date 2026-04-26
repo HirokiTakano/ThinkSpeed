@@ -340,3 +340,17 @@ body {
 .help-overlay-enter {
   animation: helpOverlayEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* =====================
+   検索ジャンプ ハイライト
+   ===================== */
+.search-jump-highlight {
+  background-color: #fef08a;
+  outline: 2px solid #facc15;
+  border-radius: 2px;
+}
+.dark .search-jump-highlight {
+  background-color: rgba(234, 179, 8, 0.45);
+  outline: 2px solid rgba(234, 179, 8, 0.75);
+  border-radius: 2px;
+}

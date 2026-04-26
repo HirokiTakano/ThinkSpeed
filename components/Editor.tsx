@@ -10,10 +10,50 @@ import Image from '@tiptap/extension-image'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Extension } from '@tiptap/core'
+import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { TextStyle, Color } from '@tiptap/extension-text-style'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react'
 import type { FileItem } from '@/hooks/useStore'
 import { matchesEvent, type ShortcutConfig } from '@/hooks/shortcuts'
+
+// ProseMirror plugin for search-jump highlight decoration.
+// State machine: armed=false → (dispatch {from,to}) → armed=true → (user click or type) → armed=false
+type HighlightState = { decos: DecorationSet; armed: boolean }
+const searchHighlightKey = new PluginKey<HighlightState>('searchHighlight')
+const SearchHighlightExtension = Extension.create({
+  name: 'searchHighlight',
+  addProseMirrorPlugins() {
+    return [
+      new Plugin<HighlightState>({
+        key: searchHighlightKey,
+        state: {
+          init() { return { decos: DecorationSet.empty, armed: false } },
+          apply(tr, old) {
+            const meta = tr.getMeta(searchHighlightKey)
+            if (meta === null) return { decos: DecorationSet.empty, armed: false }
+            if (meta !== undefined) {
+              return {
+                decos: DecorationSet.create(tr.doc, [
+                  Decoration.inline(meta.from, meta.to, { class: 'search-jump-highlight' }),
+                ]),
+                armed: true,
+              }
+            }
+            // ユーザーがクリック（pointer=true）またはタイプ（docChanged）したら解除
+            if (old.armed && (tr.docChanged || tr.getMeta('pointer') === true)) {
+              return { decos: DecorationSet.empty, armed: false }
+            }
+            return { decos: old.decos.map(tr.mapping, tr.doc), armed: old.armed }
+          },
+        },
+        props: {
+          decorations(state) { return searchHighlightKey.getState(state)?.decos ?? DecorationSet.empty },
+        },
+      }),
+    ]
+  },
+})
 
 // 空のドキュメントかどうか判定するヘルパー
 const EMPTY_BULLET: JSONContent = {
@@ -182,14 +222,20 @@ function nodeToMarkdown(node: TiptapNode, depth = 0): string {
   }
 }
 
+export type EditorHandle = {
+  findAndSelect: (query: string, occurrenceIndex?: number) => void
+}
+
 type Props = {
   file: FileItem | null
   onChange: (fileId: string, content: JSONContent) => void
   shortcuts: ShortcutConfig
   emphasisColors: [string, string, string]
+  onOpenSearch?: () => void
+  onFileReady?: () => void
 }
 
-export default function Editor({ file, onChange, shortcuts, emphasisColors }: Props) {
+const Editor = forwardRef<EditorHandle, Props>(function Editor({ file, onChange, shortcuts, emphasisColors, onOpenSearch, onFileReady }, ref) {
   const [copied, setCopied] = useState(false)
   // 現在表示中のファイルIDを追跡（ファイル切替時の誤保存防止）
   const activeFileIdRef = useRef<string | null>(null)
@@ -234,6 +280,7 @@ export default function Editor({ file, onChange, shortcuts, emphasisColors }: Pr
       TextStyle,
       Color,
       DeepIndent,
+      SearchHighlightExtension,
       Placeholder.configure({ placeholder: '思考を書き始めよう...' }),
     ],
     content: isEmptyDoc(file?.content) ? EMPTY_BULLET : (file?.content ?? EMPTY_BULLET),
@@ -299,6 +346,41 @@ export default function Editor({ file, onChange, shortcuts, emphasisColors }: Pr
     },
   })
 
+  // クエリの N 番目のマッチにジャンプ・黄色ハイライト（ユーザーがクリック or タイプするまで継続）
+  useImperativeHandle(ref, () => ({
+    findAndSelect(query: string, occurrenceIndex = 0) {
+      if (!editor || !query.trim()) return
+      const q = query.toLowerCase()
+      let matchesFound = 0
+      let found = false
+      editor.state.doc.descendants((node, pos) => {
+        if (found) return false
+        if (node.isText) {
+          const text = node.text ?? ''
+          let searchFrom = 0
+          while (!found) {
+            const idx = text.toLowerCase().indexOf(q, searchFrom)
+            if (idx === -1) break
+            if (matchesFound === occurrenceIndex) {
+              const from = pos + idx
+              const to = from + q.length
+              // カーソルのみ移動（選択なし）→ 黄色ハイライトが選択色に隠れない
+              editor.commands.setTextSelection(from)
+              // armed=true にセット → 次のユーザー操作（pointer/docChanged）で自動解除
+              editor.view.dispatch(editor.state.tr.setMeta(searchHighlightKey, { from, to }))
+              editor.commands.scrollIntoView()
+              found = true
+              break
+            }
+            matchesFound++
+            searchFrom = idx + q.length
+          }
+        }
+      })
+      if (!found) editor.commands.focus()
+    },
+  }), [editor])
+
   // ファイルが切り替わったらエディタの内容を差し替える
   useEffect(() => {
     if (!editor || !file) return
@@ -307,9 +389,9 @@ export default function Editor({ file, onChange, shortcuts, emphasisColors }: Pr
     activeFileIdRef.current = file.id
     const contentToSet = isEmptyDoc(file.content) ? EMPTY_BULLET : file.content
     editor.commands.setContent(contentToSet, { emitUpdate: false })
-    // フォーカスを先頭に
     editor.commands.focus('start')
-  }, [editor, file])
+    onFileReady?.()
+  }, [editor, file, onFileReady])
 
   // 画像ペースト: items/files 両方を試みて base64 挿入
   useEffect(() => {
@@ -364,8 +446,21 @@ export default function Editor({ file, onChange, shortcuts, emphasisColors }: Pr
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-[var(--ts-bg-main)] relative">
       {/* ファイル名表示 */}
-      <div className="sticky top-0 z-10 h-12 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm border-b border-gray-100 dark:border-zinc-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex items-center px-8">
+      <div className="sticky top-0 z-10 h-12 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm border-b border-gray-100 dark:border-zinc-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex items-center justify-between px-8">
         <span className="text-sm font-medium text-gray-600 dark:text-zinc-300 truncate">{file.name}</span>
+        {onOpenSearch && (
+          <button
+            onClick={onOpenSearch}
+            aria-label="検索 (Ctrl+F)"
+            title="検索 (Ctrl+F)"
+            className="ml-3 flex-shrink-0 rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-600 dark:hover:text-zinc-300 cursor-pointer"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* エディタ本体 */}
@@ -402,4 +497,6 @@ export default function Editor({ file, onChange, shortcuts, emphasisColors }: Pr
       </button>
     </div>
   )
-}
+})
+
+export default Editor
