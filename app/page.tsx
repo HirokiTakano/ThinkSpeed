@@ -1,7 +1,8 @@
 'use client'
 
-import Editor from '@/components/Editor'
+import Editor, { type EditorHandle } from '@/components/Editor'
 import Sidebar from '@/components/Sidebar'
+import SearchPanel from '@/components/SearchPanel'
 import { useStore } from '@/hooks/useStore'
 import {
   LIGHT_COLORS_KEY, DARK_COLORS_KEY,
@@ -14,7 +15,7 @@ import {
   DEFAULT_SHORTCUTS, SHORTCUTS_KEY, loadShortcutsFromStorage,
   type ShortcutConfig, type ShortcutDef,
 } from '@/hooks/shortcuts'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 const THEME_KEY = 'thinkspeed-theme'
 
@@ -40,6 +41,16 @@ export default function Home() {
   } = useStore()
 
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const editorRef = useRef<EditorHandle>(null)
+  const pendingFindRef = useRef<{ query: string; occurrenceIndex: number } | null>(null)
+
+  const handleFileReady = useCallback(() => {
+    if (pendingFindRef.current) {
+      editorRef.current?.findAndSelect(pendingFindRef.current.query, pendingFindRef.current.occurrenceIndex)
+      pendingFindRef.current = null
+    }
+  }, [])
   const [lightColors, setLightColors] = useState<ColorConfig>(DEFAULT_LIGHT_COLORS)
   const [darkColors, setDarkColors] = useState<ColorConfig>(DEFAULT_DARK_COLORS)
   const [shortcuts, setShortcuts] = useState<ShortcutConfig>(DEFAULT_SHORTCUTS)
@@ -59,6 +70,18 @@ export default function Home() {
 
     document.documentElement.classList.toggle('dark', t === 'dark')
     applyColorsToDOM(light, dark)
+  }, [])
+
+  // Ctrl+F / Cmd+F でカスタム検索パネルを開く（ブラウザのネイティブ検索を抑制）
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === 'f' && !e.repeat) {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [])
 
   const toggleTheme = () => {
@@ -135,8 +158,29 @@ export default function Home() {
         onChangeEmphasisColor={changeEmphasisColor}
       />
       <main className="flex-1 overflow-y-auto">
-        <Editor file={activeFile} onChange={updateFileContent} shortcuts={shortcuts} emphasisColors={emphasisColors} />
+        <Editor
+          ref={editorRef}
+          file={activeFile}
+          onChange={updateFileContent}
+          shortcuts={shortcuts}
+          emphasisColors={emphasisColors}
+          onOpenSearch={() => setSearchOpen(true)}
+          onFileReady={handleFileReady}
+        />
       </main>
+      {searchOpen && (
+        <SearchPanel
+          folders={store.folders}
+          activeFileId={store.activeFileId}
+          onSelectFile={setActiveFile}
+          onFindInCurrentFile={(q, idx) => editorRef.current?.findAndSelect(q, idx)}
+          onSelectFileAndFind={(fileId, q, idx) => {
+            pendingFindRef.current = { query: q, occurrenceIndex: idx }
+            setActiveFile(fileId)
+          }}
+          onClose={() => setSearchOpen(false)}
+        />
+      )}
     </div>
   )
 }

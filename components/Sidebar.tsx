@@ -404,6 +404,18 @@ function PatchNotesOverlay({ onClose }: { onClose: () => void }) {
 
   const RELEASES = [
     {
+      version: 'v0.8',
+      date: '2026年4月',
+      label: '検索機能',
+      color: 'cyan',
+      items: [
+        { icon: '🔍', text: 'ノート内検索を追加（Ctrl/Cmd + F またはヘッダーの🔍ボタン）' },
+        { icon: '📄', text: '「このファイル」「このフォルダ」「すべて」の3スコープで検索可能' },
+        { icon: '📋', text: '複数ヒット時は件数を表示し、それぞれクリックしてジャンプ' },
+        { icon: '🟡', text: 'ジャンプ先に黄色ハイライトを表示（クリックまたは入力で解除）' },
+      ],
+    },
+    {
       version: 'v0.7',
       date: '2026年4月',
       label: '文字色カスタマイズ',
@@ -523,6 +535,11 @@ function PatchNotesOverlay({ onClose }: { onClose: () => void }) {
       badge: 'bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800',
       dot: 'bg-violet-400',
       line: 'border-violet-200 dark:border-violet-800/60',
+    },
+    cyan: {
+      badge: 'bg-cyan-100 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800',
+      dot: 'bg-cyan-400',
+      line: 'border-cyan-200 dark:border-cyan-800/60',
     },
   }
 
