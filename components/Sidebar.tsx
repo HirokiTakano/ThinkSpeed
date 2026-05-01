@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import type { Folder, ImportMode, TrashEntry } from '@/hooks/useStore'
 import CalendarOverlay from '@/components/CalendarOverlay'
@@ -41,6 +42,10 @@ type Props = {
   onChangeShortcut: (action: keyof ShortcutConfig, def: ShortcutDef) => void
   emphasisColors: [string, string, string]
   onChangeEmphasisColor: (index: number, color: string) => void
+}
+
+function AppIcon({ size = 16, className = '' }: { size?: number; className?: string }) {
+  return <Image src="/favicon.ico" alt="" width={size} height={size} className={`shrink-0 ${className}`} />
 }
 
 function InlineEdit({
@@ -191,7 +196,7 @@ function HelpOverlay({
           戻る
         </button>
         <div className="flex items-center gap-1.5">
-          <span className="text-indigo-500">✦</span>
+          <AppIcon />
           <span className="text-sm font-semibold text-gray-700 dark:text-zinc-200">使い方ガイド</span>
         </div>
         <div className="w-14" />
@@ -203,7 +208,7 @@ function HelpOverlay({
         {/* ThinkSpeed とは */}
         <div className="rounded-xl bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/20 border border-indigo-100 dark:border-indigo-900/40 p-5">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-indigo-500 text-lg">✦</span>
+            <AppIcon size={18} />
             <h2 className="font-bold text-gray-800 dark:text-zinc-100 text-sm">ThinkSpeed とは？</h2>
           </div>
           <p className="text-sm text-gray-600 dark:text-zinc-400 leading-relaxed">
@@ -404,6 +409,16 @@ function PatchNotesOverlay({ onClose }: { onClose: () => void }) {
 
   const RELEASES = [
     {
+      version: 'v0.9',
+      date: '2026年5月',
+      label: 'アイコン更新',
+      color: 'indigo',
+      items: [
+        { icon: 'app-icon', text: 'アプリ内のブランドアイコンを変更しました' },
+        { icon: '🧭', text: 'ヘッダー、パッチノート、外観、データ管理、カレンダーのアイコン表示を統一しました' },
+      ],
+    },
+    {
       version: 'v0.8',
       date: '2026年4月',
       label: '検索機能',
@@ -487,7 +502,7 @@ function PatchNotesOverlay({ onClose }: { onClose: () => void }) {
       label: '初回リリース',
       color: 'violet',
       items: [
-        { icon: '✦', text: '箇条書きベースのアウトライナーエディタ' },
+        { icon: 'app-icon', text: '箇条書きベースのアウトライナーエディタ' },
         { icon: '📁', text: 'フォルダ・ファイルによる階層管理' },
         { icon: '⌨️', text: 'Tab / Shift+Tab による深いインデント対応' },
         { icon: '🔗', text: 'URL の自動リンク化・YouTube 動画の埋め込み' },
@@ -558,7 +573,7 @@ function PatchNotesOverlay({ onClose }: { onClose: () => void }) {
           戻る
         </button>
         <div className="flex items-center gap-1.5">
-          <span className="text-indigo-500">✦</span>
+          <AppIcon />
           <span className="text-sm font-semibold text-gray-700 dark:text-zinc-200">パッチノート</span>
         </div>
         <div className="w-14" />
@@ -595,7 +610,11 @@ function PatchNotesOverlay({ onClose }: { onClose: () => void }) {
                     <div className={`rounded-xl border ${c.line} bg-white dark:bg-zinc-800/40 overflow-hidden divide-y divide-gray-50 dark:divide-zinc-800/60`}>
                       {release.items.map((item) => (
                         <div key={item.text} className="flex items-start gap-3 px-4 py-2.5">
-                          <span className="text-base leading-tight shrink-0">{item.icon}</span>
+                          {item.icon === 'app-icon' ? (
+                            <AppIcon />
+                          ) : (
+                            <span className="text-base leading-tight shrink-0">{item.icon}</span>
+                          )}
                           <span className="text-xs text-gray-600 dark:text-zinc-300 leading-relaxed">
                             {item.text}
                           </span>
@@ -817,7 +836,7 @@ function AppearanceOverlay({
           戻る
         </button>
         <div className="flex items-center gap-1.5">
-          <span className="text-indigo-500">✦</span>
+          <AppIcon />
           <span className="text-sm font-semibold text-gray-700 dark:text-zinc-200">外観 — {modeLabel}</span>
         </div>
         <div className="w-20" />
@@ -1030,7 +1049,7 @@ function DataManagementOverlay({
           戻る
         </button>
         <div className="flex items-center gap-1.5">
-          <span className="text-indigo-500">✦</span>
+          <AppIcon />
           <span className="text-sm font-semibold text-gray-700 dark:text-zinc-200">データ管理</span>
         </div>
         <div className="w-14" />
@@ -1307,7 +1326,7 @@ export default function Sidebar({
       {/* ヘッダー */}
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-200/80 dark:border-zinc-800/80">
         <span className="flex items-center gap-1.5 font-semibold text-gray-700 dark:text-zinc-200 text-sm select-none">
-          <span className="text-indigo-500 text-base">✦</span>
+          <AppIcon />
           ThinkSpeed
         </span>
         <div className="flex items-center gap-0.5">
