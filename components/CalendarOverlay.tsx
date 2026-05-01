@@ -13,9 +13,10 @@ type Props = {
 }
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
+const APP_ICON_SRC = '/thinkspeed-icon.ico?v=20260502'
 
 function AppIcon() {
-  return <Image src="/favicon.ico" alt="" width={16} height={16} className="shrink-0" />
+  return <Image src={APP_ICON_SRC} alt="" width={16} height={16} className="shrink-0" unoptimized />
 }
 
 function localToday(): string {

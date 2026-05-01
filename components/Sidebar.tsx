@@ -44,8 +44,10 @@ type Props = {
   onChangeEmphasisColor: (index: number, color: string) => void
 }
 
+const APP_ICON_SRC = '/thinkspeed-icon.ico?v=20260502'
+
 function AppIcon({ size = 16, className = '' }: { size?: number; className?: string }) {
-  return <Image src="/favicon.ico" alt="" width={size} height={size} className={`shrink-0 ${className}`} />
+  return <Image src={APP_ICON_SRC} alt="" width={size} height={size} className={`shrink-0 ${className}`} unoptimized />
 }
 
 function InlineEdit({
