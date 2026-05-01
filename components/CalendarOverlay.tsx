@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState, useEffect, useMemo } from 'react'
 import type { Folder } from '@/hooks/useStore'
 import { parseEventsFromFolders, type CalendarEvent } from '@/hooks/parseEvents'
@@ -12,6 +13,10 @@ type Props = {
 }
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
+
+function AppIcon() {
+  return <Image src="/favicon.ico" alt="" width={16} height={16} className="shrink-0" />
+}
 
 function localToday(): string {
   const d = new Date()
@@ -101,7 +106,7 @@ export default function CalendarOverlay({ folders, onSelectFile, onClose, onOpen
           戻る
         </button>
         <div className="flex items-center gap-1.5">
-          <span className="text-indigo-500">✦</span>
+          <AppIcon />
           <span className="text-sm font-semibold text-gray-700 dark:text-zinc-200">カレンダー</span>
         </div>
         <button
