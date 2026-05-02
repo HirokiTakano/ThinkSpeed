@@ -31,7 +31,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files — never commit secrets
+# env files — never commit secrets or local OAuth client IDs
 .env
 .env.local
 .env.development.local
@@ -74,4 +74,3 @@ ehthumbs.db
 # Logs
 logs/
 *.log
-

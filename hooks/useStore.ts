@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { JSONContent } from '@tiptap/react'
+import { removeCalendarEventFromFolders, type CalendarEvent } from '@/hooks/parseEvents'
 
 export type FileItem = { id: string; name: string; content: JSONContent; createdOn?: string }
 export type Folder = { id: string; name: string; files: FileItem[] }
@@ -241,6 +242,14 @@ export function useStore() {
     setStore(s => ({ ...s, trash: [] }))
   }, [])
 
+  const removeCalendarEventLine = useCallback((event: CalendarEvent) => {
+    const currentYear = new Date().getFullYear()
+    setStore(s => ({
+      ...s,
+      folders: removeCalendarEventFromFolders(s.folders, event, currentYear),
+    }))
+  }, [])
+
   const exportData = useCallback(() => {
     const payload = {
       version: 1,
@@ -386,6 +395,7 @@ export function useStore() {
     restoreFromTrash,
     permanentlyDelete,
     emptyTrash,
+    removeCalendarEventLine,
     exportData,
     exportFolder,
     exportFile,

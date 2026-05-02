@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import type { Folder, ImportMode, TrashEntry } from '@/hooks/useStore'
+import type { useGoogleCalendarSync } from '@/hooks/useGoogleCalendarSync'
 import CalendarOverlay from '@/components/CalendarOverlay'
 import {
   BG_LIGHT_SWATCHES, BG_DARK_SWATCHES,
@@ -42,6 +43,7 @@ type Props = {
   onChangeShortcut: (action: keyof ShortcutConfig, def: ShortcutDef) => void
   emphasisColors: [string, string, string]
   onChangeEmphasisColor: (index: number, color: string) => void
+  googleCalendarSync: ReturnType<typeof useGoogleCalendarSync>
 }
 
 const APP_ICON_SRC = '/thinkspeed-icon.ico?v=20260502'
@@ -1286,6 +1288,7 @@ export default function Sidebar({
   onChangeShortcut,
   emphasisColors,
   onChangeEmphasisColor,
+  googleCalendarSync,
 }: Props) {
   const [closedFolders, setClosedFolders] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<{
@@ -1647,6 +1650,7 @@ export default function Sidebar({
     {showCalendar && (
       <CalendarOverlay
         folders={folders}
+        googleCalendarSync={googleCalendarSync}
         onSelectFile={selectAndRevealFile}
         onClose={() => setShowCalendar(false)}
         onOpenHelp={() => { setShowCalendar(false); setShowHelp(true) }}

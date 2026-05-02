@@ -4,9 +4,11 @@ import Image from 'next/image'
 import { useState, useEffect, useMemo } from 'react'
 import type { Folder } from '@/hooks/useStore'
 import { parseEventsFromFolders, type CalendarEvent } from '@/hooks/parseEvents'
+import type { useGoogleCalendarSync } from '@/hooks/useGoogleCalendarSync'
 
 type Props = {
   folders: Folder[]
+  googleCalendarSync: ReturnType<typeof useGoogleCalendarSync>
   onSelectFile: (id: string) => void
   onClose: () => void
   onOpenHelp: () => void
@@ -24,7 +26,7 @@ function localToday(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-export default function CalendarOverlay({ folders, onSelectFile, onClose, onOpenHelp }: Props) {
+export default function CalendarOverlay({ folders, googleCalendarSync, onSelectFile, onClose, onOpenHelp }: Props) {
   const today = localToday()
   const now = new Date()
   const currentYear = now.getFullYear()
@@ -122,6 +124,42 @@ export default function CalendarOverlay({ folders, onSelectFile, onClose, onOpen
       </header>
 
       <div className="max-w-xl mx-auto px-6 py-8 space-y-4">
+        <section className="rounded-lg bg-white dark:bg-zinc-800/50 border border-gray-100 dark:border-zinc-700/50 px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-700 dark:text-zinc-200">Google カレンダー同期</p>
+              <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-0.5 truncate">
+                {googleCalendarSync.message}
+              </p>
+            </div>
+            {googleCalendarSync.connected ? (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => void googleCalendarSync.sync()}
+                  disabled={googleCalendarSync.status === 'syncing'}
+                  className="px-2.5 py-1 rounded-md text-[10px] font-medium text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 disabled:opacity-50 transition-colors"
+                >
+                  同期
+                </button>
+                <button
+                  onClick={googleCalendarSync.disconnect}
+                  className="px-2.5 py-1 rounded-md text-[10px] font-medium text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700/60 transition-colors"
+                >
+                  解除
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={googleCalendarSync.connect}
+                disabled={!googleCalendarSync.enabled || googleCalendarSync.status === 'connecting'}
+                className="px-3 py-1.5 rounded-md text-[10px] font-semibold text-white bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-300 dark:disabled:bg-zinc-700 transition-colors shrink-0"
+              >
+                接続
+              </button>
+            )}
+          </div>
+        </section>
+
         <div className="space-y-4">
             {/* 月ナビゲーション */}
             <div className="flex items-center justify-between">

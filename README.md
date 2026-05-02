@@ -19,6 +19,7 @@ ThinkSpeed は、箇条書きで考えを素早く書き出し、構造化する
 - **Markdown コピー**: ノート内容を Markdown としてクリップボードにコピーできます。
 - **JSON バックアップ**: 全データ、フォルダ単位、ファイル単位で書き出し・読み込みできます。
 - **ゴミ箱**: 削除したフォルダやファイルを復元できます。
+- **Google カレンダー同期**: カレンダー予定を Google カレンダーへ追加し、双方の削除を反映できます。
 
 ## 開発に参加する方へ
 
@@ -47,6 +48,30 @@ npm run dev
 ```
 
 ブラウザで `http://localhost:3000` を開いてください。
+
+Google カレンダー同期を使う場合は、Google Cloud Console で Calendar API を有効化し、OAuth クライアント ID（ウェブアプリ）を作成して `.env.local` に設定してください。
+
+```bash
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+```
+
+Google Cloud Console 側の設定:
+
+1. `API とサービス` → `ライブラリ` で Google Calendar API を有効化する。
+2. `API とサービス` → `OAuth 同意画面` でアプリ名、サポートメール、デベロッパー連絡先を設定する。
+3. 公開前の開発中は `対象` / `Audience` のテストユーザーに、自分の Google アカウントを追加する。
+4. `API とサービス` → `認証情報` で OAuth クライアント ID を作成する。
+5. アプリケーションの種類は `ウェブ アプリケーション` を選ぶ。
+6. 承認済み JavaScript 生成元に、開発環境なら `http://localhost:3000` を追加する。
+7. 承認済みのリダイレクト URI は、この実装では空欄でよい。
+
+公開版で Google カレンダー同期を有効化する前に必要な確認:
+
+- 本番ドメインを Google Cloud Console の承認済み JavaScript 生成元に追加する。
+- OAuth 同意画面にプライバシーポリシー URL など公開に必要な情報を設定する。
+- `https://www.googleapis.com/auth/calendar.events` の利用理由を説明できる状態にする。
+- Google の OAuth 検証が必要な場合は、検証完了後に main へマージする。
+- 検証完了までは、この機能は Draft PR として保持し、公開ブランチへマージしない。
 
 品質チェック:
 

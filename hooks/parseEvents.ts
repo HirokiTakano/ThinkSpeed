@@ -7,6 +7,7 @@ export type CalendarEvent = {
   task: string
   fileId: string
   fileName: string
+  sourceLine: string
 }
 
 /** Normalize full-width digits and colons to half-width */
@@ -103,7 +104,7 @@ function parseEventFromLine(
     if (!task || !isValidDate(year, month, day)) return null
     const time = parseTime(m[4])
     const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    return { dateKey, time, task, fileId, fileName }
+    return { dateKey, time, task, fileId, fileName, sourceLine: normalized }
   }
 
   // Try M/D slash format
@@ -115,10 +116,81 @@ function parseEventFromLine(
     if (!task || !isValidDate(currentYear, month, day)) return null
     const time = parseTime(s[3])
     const dateKey = `${currentYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    return { dateKey, time, task, fileId, fileName }
+    return { dateKey, time, task, fileId, fileName, sourceLine: normalized }
   }
 
   return null
+}
+
+export function calendarEventKey(ev: Pick<CalendarEvent, 'fileId' | 'dateKey' | 'time' | 'task'>): string {
+  const raw = `${ev.fileId}\u001f${ev.dateKey}\u001f${ev.time ?? ''}\u001f${ev.task}`
+  let hash = 2166136261
+  for (let i = 0; i < raw.length; i++) {
+    hash ^= raw.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return `ts_${(hash >>> 0).toString(36)}`
+}
+
+function inlineText(node: JSONContent): string {
+  if (node.type === 'text') return node.text ?? ''
+  if (node.type === 'hardBreak') return '\n'
+  return (node.content ?? []).map(inlineText).join('')
+}
+
+function nodeHasTargetEvent(
+  node: JSONContent,
+  target: Pick<CalendarEvent, 'fileId' | 'dateKey' | 'time' | 'task' | 'sourceLine'>,
+  currentYear: number,
+): boolean {
+  if (node.type !== 'paragraph' && node.type !== 'heading') return false
+  const raw = inlineText(node)
+  return raw.split('\n').some(segment => {
+    const line = segment.trim()
+    if (!line) return false
+    const ev = parseEventFromLine(line, currentYear, target.fileId, '')
+    return !!ev &&
+      ev.dateKey === target.dateKey &&
+      ev.time === target.time &&
+      ev.task === target.task &&
+      ev.sourceLine === target.sourceLine
+  })
+}
+
+function removeEventFromContent(
+  content: JSONContent,
+  target: Pick<CalendarEvent, 'fileId' | 'dateKey' | 'time' | 'task' | 'sourceLine'>,
+  currentYear: number,
+): JSONContent | null {
+  if (nodeHasTargetEvent(content, target, currentYear)) return null
+
+  if (content.type === 'listItem' || content.type === 'taskItem') {
+    const hasTargetParagraph = (content.content ?? []).some(child => nodeHasTargetEvent(child, target, currentYear))
+    if (hasTargetParagraph) return null
+  }
+
+  if (!content.content) return content
+
+  const children = content.content
+    .map(child => removeEventFromContent(child, target, currentYear))
+    .filter((child): child is JSONContent => child !== null)
+
+  return { ...content, content: children }
+}
+
+export function removeCalendarEventFromFolders(
+  folders: Folder[],
+  target: Pick<CalendarEvent, 'fileId' | 'dateKey' | 'time' | 'task' | 'sourceLine'>,
+  currentYear: number,
+): Folder[] {
+  return folders.map(folder => ({
+    ...folder,
+    files: folder.files.map(file => {
+      if (file.id !== target.fileId) return file
+      const content = removeEventFromContent(file.content, target, currentYear)
+      return content ? { ...file, content } : file
+    }),
+  }))
 }
 
 /** Scan all folders and return calendar events parsed from note content. */
