@@ -11,11 +11,11 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://www.youtube-nocookie.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://www.youtube-nocookie.com https://accounts.google.com",
               "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
               "img-src 'self' data: https://i.ytimg.com https://img.youtube.com",
               "style-src 'self' 'unsafe-inline'",
-              "connect-src 'self'",
+              "connect-src 'self' https://www.googleapis.com https://accounts.google.com",
             ].join('; '),
           },
         ],
