@@ -6,6 +6,7 @@ import type { JSONContent } from '@tiptap/react'
 export type FileItem = { id: string; name: string; content: JSONContent; createdOn?: string }
 export type Folder = { id: string; name: string; files: FileItem[] }
 export type ImportMode = 'overwrite' | 'rename'
+export type DropPosition = 'before' | 'after'
 
 export type TrashEntry = {
   id: string
@@ -146,6 +147,78 @@ export function useStore() {
         files: folder.files.map(f => (f.id === fileId ? { ...f, name } : f)),
       })),
     }))
+  }, [])
+
+  const moveFolder = useCallback((folderId: string, targetFolderId: string, position: DropPosition) => {
+    setStore(s => {
+      if (folderId === targetFolderId) return s
+      const fromIndex = s.folders.findIndex(folder => folder.id === folderId)
+      const targetIndex = s.folders.findIndex(folder => folder.id === targetFolderId)
+      if (fromIndex === -1 || targetIndex === -1) return s
+
+      const folders = [...s.folders]
+      const [folder] = folders.splice(fromIndex, 1)
+      const targetIndexAfterRemoval = folders.findIndex(f => f.id === targetFolderId)
+      const insertIndex = position === 'before' ? targetIndexAfterRemoval : targetIndexAfterRemoval + 1
+      folders.splice(insertIndex, 0, folder)
+      return { ...s, folders }
+    })
+  }, [])
+
+  const moveFile = useCallback((
+    fileId: string,
+    targetFolderId: string,
+    targetFileId?: string,
+    position: DropPosition = 'after'
+  ) => {
+    setStore(s => {
+      let movedFile: FileItem | undefined
+      let sourceFolderId: string | undefined
+      const foldersWithoutFile = s.folders.map(folder => {
+        const file = folder.files.find(f => f.id === fileId)
+        if (!file) return folder
+        movedFile = file
+        sourceFolderId = folder.id
+        return { ...folder, files: folder.files.filter(f => f.id !== fileId) }
+      })
+      if (!movedFile || !sourceFolderId) return s
+
+      const targetFolder = foldersWithoutFile.find(folder => folder.id === targetFolderId)
+      if (!targetFolder) return s
+      if (targetFileId === fileId) return s
+
+      const targetFiles = [...targetFolder.files]
+      let insertIndex = targetFiles.length
+      if (targetFileId) {
+        const targetIndex = targetFiles.findIndex(f => f.id === targetFileId)
+        if (targetIndex === -1) return s
+        insertIndex = position === 'before' ? targetIndex : targetIndex + 1
+      }
+
+      if (sourceFolderId === targetFolderId) {
+        const originalFolder = s.folders.find(folder => folder.id === sourceFolderId)
+        const originalSourceIndex = originalFolder?.files.findIndex(f => f.id === fileId) ?? -1
+        const originalTargetIndex = originalFolder?.files.findIndex(f => f.id === targetFileId) ?? -1
+        if (
+          targetFileId &&
+          originalSourceIndex !== -1 &&
+          originalTargetIndex !== -1 &&
+          (originalSourceIndex === originalTargetIndex ||
+            (position === 'after' && originalSourceIndex === originalTargetIndex + 1) ||
+            (position === 'before' && originalSourceIndex === originalTargetIndex - 1))
+        ) {
+          return s
+        }
+      }
+
+      targetFiles.splice(insertIndex, 0, movedFile)
+      return {
+        ...s,
+        folders: foldersWithoutFile.map(folder =>
+          folder.id === targetFolderId ? { ...folder, files: targetFiles } : folder
+        ),
+      }
+    })
   }, [])
 
   const deleteFolder = useCallback((folderId: string) => {
@@ -381,6 +454,8 @@ export function useStore() {
     addFile,
     renameFolder,
     renameFile,
+    moveFolder,
+    moveFile,
     deleteFolder,
     deleteFile,
     restoreFromTrash,
