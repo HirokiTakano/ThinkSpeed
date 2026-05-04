@@ -2,7 +2,8 @@
 
 import Image from 'next/image'
 import { useRef, useState, useEffect, useCallback } from 'react'
-import type { Folder, ImportMode, TrashEntry } from '@/hooks/useStore'
+import type { DragEvent } from 'react'
+import type { DropPosition, Folder, ImportMode, TrashEntry } from '@/hooks/useStore'
 import CalendarOverlay from '@/components/CalendarOverlay'
 import {
   BG_LIGHT_SWATCHES, BG_DARK_SWATCHES,
@@ -23,6 +24,8 @@ type Props = {
   onAddFile: (folderId: string) => void
   onRenameFolder: (id: string, name: string) => void
   onRenameFile: (id: string, name: string) => void
+  onMoveFolder: (folderId: string, targetFolderId: string, position: DropPosition) => void
+  onMoveFile: (fileId: string, targetFolderId: string, targetFileId?: string, position?: DropPosition) => void
   onDeleteFolder: (id: string) => void
   onDeleteFile: (id: string) => void
   trash: TrashEntry[]
@@ -83,6 +86,11 @@ function InlineEdit({
 
 
 type RecordingTarget = keyof ShortcutConfig | null
+
+type DraggedItem = { type: 'folder' | 'file'; id: string }
+type DragOverTarget =
+  | { type: 'folder'; id: string; position: DropPosition | 'inside' }
+  | { type: 'file'; id: string; position: DropPosition }
 
 function HelpOverlay({
   shortcuts,
@@ -410,6 +418,18 @@ function PatchNotesOverlay({ onClose }: { onClose: () => void }) {
   }, [onClose])
 
   const RELEASES = [
+    {
+      version: 'v0.10',
+      date: '2026年5月',
+      label: 'ドラッグ移動',
+      color: 'teal',
+      items: [
+        { icon: '↕️', text: 'サイドバーでフォルダをドラッグして並び替えられるようになりました' },
+        { icon: '📄', text: 'ファイルを同じフォルダ内でドラッグして順番変更できます' },
+        { icon: '📁', text: 'ファイルを別フォルダへドラッグして移動できるようになりました' },
+        { icon: '✨', text: 'ドロップ先が分かりやすいようにハイライト表示を追加しました' },
+      ],
+    },
     {
       version: 'v0.9',
       date: '2026年5月',
@@ -1267,6 +1287,8 @@ export default function Sidebar({
   onAddFile,
   onRenameFolder,
   onRenameFile,
+  onMoveFolder,
+  onMoveFile,
   onDeleteFolder,
   onDeleteFile,
   trash,
@@ -1298,6 +1320,8 @@ export default function Sidebar({
   const [showPatchNotes, setShowPatchNotes] = useState(false)
   const [showDataMgmt, setShowDataMgmt] = useState(false)
   const [showTrash, setShowTrash] = useState(false)
+  const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null)
+  const [dragOverTarget, setDragOverTarget] = useState<DragOverTarget | null>(null)
 
   // カレンダーからファイルを選ぶとき、親フォルダを自動展開する
   const selectAndRevealFile = useCallback((fileId: string) => {
@@ -1317,9 +1341,82 @@ export default function Sidebar({
   const toggleFolder = (id: string) => {
     setClosedFolders(prev => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
       return next
     })
+  }
+
+  const handleDragStart = (e: DragEvent, item: DraggedItem) => {
+    setDraggedItem(item)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('application/x-thinkspeed-item', JSON.stringify(item))
+    e.dataTransfer.setData('text/plain', item.id)
+  }
+
+  const clearDragState = () => {
+    setDraggedItem(null)
+    setDragOverTarget(null)
+  }
+
+  const positionFromPointer = (e: DragEvent<HTMLElement>): DropPosition => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    return e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+  }
+
+  const handleFolderDragOver = (e: DragEvent<HTMLDivElement>, folderId: string) => {
+    if (!draggedItem) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (draggedItem.type === 'folder') {
+      if (draggedItem.id === folderId) return
+      setDragOverTarget({ type: 'folder', id: folderId, position: positionFromPointer(e) })
+      return
+    }
+    setDragOverTarget({ type: 'folder', id: folderId, position: 'inside' })
+  }
+
+  const handleFolderDrop = (e: DragEvent<HTMLDivElement>, targetFolderId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!draggedItem) return
+    if (draggedItem.type === 'folder') {
+      const position =
+        dragOverTarget?.type === 'folder' && dragOverTarget.id === targetFolderId && dragOverTarget.position !== 'inside'
+          ? dragOverTarget.position
+          : positionFromPointer(e)
+      onMoveFolder(draggedItem.id, targetFolderId, position)
+    } else {
+      onMoveFile(draggedItem.id, targetFolderId)
+      setClosedFolders(prev => {
+        const next = new Set(prev)
+        next.delete(targetFolderId)
+        return next
+      })
+    }
+    clearDragState()
+  }
+
+  const handleFileDragOver = (e: DragEvent<HTMLDivElement>, fileId: string) => {
+    if (!draggedItem || draggedItem.type !== 'file' || draggedItem.id === fileId) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverTarget({ type: 'file', id: fileId, position: positionFromPointer(e) })
+  }
+
+  const handleFileDrop = (e: DragEvent<HTMLDivElement>, targetFolderId: string, targetFileId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!draggedItem || draggedItem.type !== 'file') return
+    const position =
+      dragOverTarget?.type === 'file' && dragOverTarget.id === targetFileId
+        ? dragOverTarget.position
+        : positionFromPointer(e)
+    onMoveFile(draggedItem.id, targetFolderId, targetFileId, position)
+    clearDragState()
   }
 
   return (
@@ -1378,10 +1475,32 @@ export default function Sidebar({
       <div className="flex-1 min-h-0 overflow-y-auto py-2">
         {folders.map(folder => {
           const isOpen = !closedFolders.has(folder.id)
+          const folderDragTarget = dragOverTarget?.type === 'folder' && dragOverTarget.id === folder.id
+          const folderDropBefore = folderDragTarget && dragOverTarget.position === 'before'
+          const folderDropAfter = folderDragTarget && dragOverTarget.position === 'after'
+          const folderDropInside = folderDragTarget && dragOverTarget.position === 'inside'
           return (
             <div key={folder.id}>
               {/* フォルダ行 */}
-              <div className="group flex items-center gap-1 px-3 py-1.5 hover:bg-gray-200/60 dark:hover:bg-zinc-700/40 select-none">
+              <div
+                draggable={!editing}
+                onDragStart={e => handleDragStart(e, { type: 'folder', id: folder.id })}
+                onDragEnd={clearDragState}
+                onDragOver={e => handleFolderDragOver(e, folder.id)}
+                onDrop={e => handleFolderDrop(e, folder.id)}
+                onDragLeave={e => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOverTarget(null)
+                }}
+                className={`group relative flex items-center gap-1 px-3 py-1.5 select-none transition-colors
+                  ${editing ? '' : 'cursor-grab active:cursor-grabbing'}
+                  ${folderDropInside
+                    ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-200 dark:bg-indigo-950/50 dark:ring-indigo-800'
+                    : 'hover:bg-gray-200/60 dark:hover:bg-zinc-700/40'
+                  }
+                  ${folderDropBefore ? 'before:absolute before:left-3 before:right-3 before:top-0 before:h-0.5 before:bg-indigo-400 before:content-[""]' : ''}
+                  ${folderDropAfter ? 'after:absolute after:left-3 after:right-3 after:bottom-0 after:h-0.5 after:bg-indigo-400 after:content-[""]' : ''}
+                `}
+              >
                 {/* 折りたたみシェブロン */}
                 <button
                   onClick={() => toggleFolder(folder.id)}
@@ -1459,15 +1578,30 @@ export default function Sidebar({
                 <div>
                   {folder.files.map(file => {
                     const isActive = file.id === activeFileId
+                    const fileDragTarget = dragOverTarget?.type === 'file' && dragOverTarget.id === file.id
+                    const fileDropBefore = fileDragTarget && dragOverTarget.position === 'before'
+                    const fileDropAfter = fileDragTarget && dragOverTarget.position === 'after'
                     return (
                       <div
                         key={file.id}
+                        draggable={!editing}
+                        onDragStart={e => handleDragStart(e, { type: 'file', id: file.id })}
+                        onDragEnd={clearDragState}
+                        onDragOver={e => handleFileDragOver(e, file.id)}
+                        onDrop={e => handleFileDrop(e, folder.id, file.id)}
+                        onDragLeave={e => {
+                          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOverTarget(null)
+                        }}
                         onClick={() => onSelectFile(file.id)}
-                        className={`group flex items-center gap-1.5 pl-8 pr-3 py-1.5 cursor-pointer select-none transition-colors
+                        className={`group relative flex items-center gap-1.5 pl-8 pr-3 py-1.5 cursor-pointer select-none transition-colors
                           ${isActive
                             ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'
                             : 'text-gray-500 hover:bg-gray-200/60 dark:text-zinc-400 dark:hover:bg-zinc-700/40'
-                          }`}
+                          }
+                          ${editing ? '' : 'cursor-grab active:cursor-grabbing'}
+                          ${fileDropBefore ? 'before:absolute before:left-8 before:right-3 before:top-0 before:h-0.5 before:bg-indigo-400 before:content-[""]' : ''}
+                          ${fileDropAfter ? 'after:absolute after:left-8 after:right-3 after:bottom-0 after:h-0.5 after:bg-indigo-400 after:content-[""]' : ''}
+                        `}
                       >
                         <svg
                           className={`w-3 h-3 shrink-0 ${isActive ? 'text-indigo-400' : 'text-gray-400 dark:text-zinc-500'}`}

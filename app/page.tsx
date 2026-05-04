@@ -29,6 +29,8 @@ export default function Home() {
     addFile,
     renameFolder,
     renameFile,
+    moveFolder,
+    moveFile,
     deleteFolder,
     deleteFile,
     restoreFromTrash,
@@ -137,6 +139,8 @@ export default function Home() {
         onAddFile={addFile}
         onRenameFolder={renameFolder}
         onRenameFile={renameFile}
+        onMoveFolder={moveFolder}
+        onMoveFile={moveFile}
         onDeleteFolder={deleteFolder}
         onDeleteFile={deleteFile}
         trash={store.trash}
