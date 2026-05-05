@@ -75,3 +75,12 @@ ehthumbs.db
 logs/
 *.log
 
+# Local/private security notes
+SECURITY_AUDIT.md
+security_audit.md
+.security/
+security-reports/
+npm-audit*.json
+
+# Local AI/tooling workspaces
+.codex/

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { JSONContent } from '@tiptap/react'
+import { MAX_IMPORT_BYTES, parseFoldersFromImport, sanitizeContent, sanitizeFolders } from '@/hooks/sanitizeStore'
 
 export type FileItem = { id: string; name: string; content: JSONContent; createdOn?: string }
 export type Folder = { id: string; name: string; files: FileItem[] }
@@ -55,10 +56,41 @@ function loadFromStorage(): Store {
     try {
       const parsed = JSON.parse(saved)
       if (parsed.folders && Array.isArray(parsed.folders)) {
+        const folders = sanitizeFolders(parsed.folders)
+        const allFiles = folders.flatMap(f => f.files)
+        const activeFileId =
+          typeof parsed.activeFileId === 'string' && allFiles.some(f => f.id === parsed.activeFileId)
+            ? parsed.activeFileId
+            : allFiles[0]?.id ?? null
         const trash: TrashEntry[] = Array.isArray(parsed.trash)
-          ? (parsed.trash as TrashEntry[]).filter(t => Date.now() - t.deletedAt < THIRTY_DAYS_MS)
+          ? (parsed.trash as TrashEntry[]).flatMap((t): TrashEntry[] => {
+              if (!t || typeof t.deletedAt !== 'number' || Date.now() - t.deletedAt >= THIRTY_DAYS_MS) return []
+              try {
+                if (t.type === 'folder') {
+                  const [payload] = sanitizeFolders([t.payload])
+                  return [{ ...t, payload }]
+                }
+                if (t.type === 'file') {
+                  const payload = t.payload as FileItem
+                  if (!payload || typeof payload !== 'object') return []
+                  const entry: TrashEntry = {
+                    ...t,
+                    payload: {
+                      ...payload,
+                      id: typeof payload.id === 'string' ? payload.id : crypto.randomUUID(),
+                      name: typeof payload.name === 'string' ? payload.name : '復元したファイル',
+                      content: sanitizeContent(payload.content),
+                    },
+                  }
+                  return [entry]
+                }
+                return []
+              } catch {
+                return []
+              }
+            })
           : []
-        return { folders: parsed.folders, activeFileId: parsed.activeFileId ?? null, trash }
+        return { folders, activeFileId, trash }
       }
     } catch { /* fall through */ }
   }
@@ -67,7 +99,7 @@ function loadFromStorage(): Store {
   const legacy = localStorage.getItem(LEGACY_KEY)
   if (legacy) {
     try {
-      const content = JSON.parse(legacy) as JSONContent
+      const content = sanitizeContent(JSON.parse(legacy))
       const folder = newFolder('はじめのフォルダ')
       folder.files[0] = { ...folder.files[0], content }
       return { folders: [folder], activeFileId: folder.files[0].id, trash: [] }
@@ -83,6 +115,7 @@ export function useStore() {
 
   // Load from localStorage on mount (client only)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is client-only; initial render must stay deterministic for hydration.
     setStore(loadFromStorage())
     hydrated.current = true
   }, [])
@@ -362,20 +395,15 @@ export function useStore() {
   }, [store.folders])
 
   const importData = useCallback((file: File, onResult?: (ok: boolean) => void) => {
+    if (file.size > MAX_IMPORT_BYTES) {
+      onResult?.(false)
+      return
+    }
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
         const json = JSON.parse(e.target?.result as string)
-        // version 1 ラッパーと生の folders 配列の両方に対応
-        const folders: Folder[] = Array.isArray(json) ? json : json.folders
-        if (!Array.isArray(folders) || folders.length === 0) throw new Error('Invalid')
-        // 最低限のバリデーション
-        for (const f of folders) {
-          if (typeof f.id !== 'string' || !Array.isArray(f.files)) throw new Error('Invalid')
-          for (const fi of f.files) {
-            if (typeof fi.id !== 'string' || typeof fi.name !== 'string') throw new Error('Invalid')
-          }
-        }
+        const folders = parseFoldersFromImport(json)
         const allFiles = folders.flatMap(f => f.files)
         const activeFileId = allFiles[0]?.id ?? null
         setStore(s => ({ ...s, folders, activeFileId }))
@@ -388,11 +416,12 @@ export function useStore() {
   }, [])
 
   const applyImport = useCallback((importedFolders: Folder[], mode: ImportMode) => {
+    const safeImportedFolders = sanitizeFolders(importedFolders)
     setStore(prev => {
       if (mode === 'overwrite') {
         const updatedFolders = [...prev.folders]
         let newActiveFileId = prev.activeFileId
-        for (const importedFolder of importedFolders) {
+        for (const importedFolder of safeImportedFolders) {
           const existingIdx = updatedFolders.findIndex(f => f.name === importedFolder.name)
           if (existingIdx === -1) {
             updatedFolders.push({
@@ -423,7 +452,7 @@ export function useStore() {
         // フォルダ名が衝突する場合は「フォルダ名 (2)」のように別名で追加
         const updatedFolders = [...prev.folders]
         const existingFolderNames = new Set(updatedFolders.map(f => f.name))
-        for (const importedFolder of importedFolders) {
+        for (const importedFolder of safeImportedFolders) {
           let newFolderName = importedFolder.name
           if (existingFolderNames.has(newFolderName)) {
             let counter = 2
