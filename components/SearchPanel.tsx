@@ -80,7 +80,6 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
 type Props = {
   folders: Folder[]
   activeFileId: string | null
-  onSelectFile: (id: string) => void
   onFindInCurrentFile?: (query: string, occurrenceIndex: number) => void
   onSelectFileAndFind?: (fileId: string, query: string, occurrenceIndex: number) => void
   onClose: () => void
@@ -92,7 +91,7 @@ const TABS: { key: SearchScope; label: string }[] = [
   { key: 'all', label: 'すべて' },
 ]
 
-export default function SearchPanel({ folders, activeFileId, onSelectFile, onFindInCurrentFile, onSelectFileAndFind, onClose }: Props) {
+export default function SearchPanel({ folders, activeFileId, onFindInCurrentFile, onSelectFileAndFind, onClose }: Props) {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [scope, setScope] = useState<SearchScope>('file')

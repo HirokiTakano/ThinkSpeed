@@ -64,6 +64,7 @@ export default function Home() {
     const t: 'light' | 'dark' = saved === 'dark' ? 'dark' : 'light'
     const { light, dark } = loadColorsFromStorage()
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- these preferences are browser-only and must be loaded after hydration.
     setTheme(t)
     setLightColors(light)
     setDarkColors(dark)
@@ -176,7 +177,6 @@ export default function Home() {
         <SearchPanel
           folders={store.folders}
           activeFileId={store.activeFileId}
-          onSelectFile={setActiveFile}
           onFindInCurrentFile={(q, idx) => editorRef.current?.findAndSelect(q, idx)}
           onSelectFileAndFind={(fileId, q, idx) => {
             pendingFindRef.current = { query: q, occurrenceIndex: idx }
@@ -188,4 +188,3 @@ export default function Home() {
     </div>
   )
 }
-

@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import type { DragEvent } from 'react'
 import type { DropPosition, Folder, ImportMode, TrashEntry } from '@/hooks/useStore'
+import { MAX_IMPORT_BYTES, parseFoldersFromImport } from '@/hooks/sanitizeStore'
 import CalendarOverlay from '@/components/CalendarOverlay'
 import {
   BG_LIGHT_SWATCHES, BG_DARK_SWATCHES,
@@ -676,6 +677,7 @@ function TrashOverlay({
   }, [onClose])
 
   const daysLeft = (deletedAt: number) => {
+    // eslint-disable-next-line react-hooks/purity -- this overlay intentionally shows time-relative trash expiry.
     const elapsed = Date.now() - deletedAt
     const remaining = Math.ceil((30 * 24 * 60 * 60 * 1000 - elapsed) / (24 * 60 * 60 * 1000))
     return Math.max(0, remaining)
@@ -1002,25 +1004,28 @@ function DataManagementOverlay({
   const handleExportFile = (id: string) => { onExportFile(id); flashExport(id) }
 
   const toggleExpand = (id: string) => {
-    setExpandedFolders(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
+    setExpandedFolders(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     e.target.value = ''
+    if (file.size > MAX_IMPORT_BYTES) {
+      setImportFeedback('err')
+      setTimeout(() => setImportFeedback('idle'), 2500)
+      return
+    }
     const reader = new FileReader()
     reader.onload = (ev) => {
       try {
         const json = JSON.parse(ev.target?.result as string)
-        const parsed: Folder[] = Array.isArray(json) ? json : json.folders
-        if (!Array.isArray(parsed) || parsed.length === 0) throw new Error()
-        for (const f of parsed) {
-          if (typeof f.id !== 'string' || !Array.isArray(f.files)) throw new Error()
-          for (const fi of f.files) {
-            if (typeof fi.id !== 'string' || typeof fi.name !== 'string') throw new Error()
-          }
-        }
+        const parsed = parseFoldersFromImport(json)
         setPendingFolders(parsed)
         setImportStep('select-mode')
       } catch {
