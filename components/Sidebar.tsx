@@ -420,6 +420,17 @@ function PatchNotesOverlay({ onClose }: { onClose: () => void }) {
 
   const RELEASES = [
     {
+      version: 'v0.11',
+      date: '2026年5月',
+      label: 'サイドバー折りたたみ',
+      color: 'violet',
+      items: [
+        { icon: '↔️', text: 'サイドバーを折りたためるようになりました' },
+        { icon: '◀', text: 'ThinkSpeed ロゴの左に折りたたみボタンを追加しました' },
+        { icon: '▶', text: '折りたたみ中もボタンからすぐに再展開できます' },
+      ],
+    },
+    {
       version: 'v0.10',
       date: '2026年5月',
       label: 'ドラッグ移動',
@@ -1325,6 +1336,7 @@ export default function Sidebar({
   const [showPatchNotes, setShowPatchNotes] = useState(false)
   const [showDataMgmt, setShowDataMgmt] = useState(false)
   const [showTrash, setShowTrash] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(false)
   const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null)
   const [dragOverTarget, setDragOverTarget] = useState<DragOverTarget | null>(null)
 
@@ -1426,14 +1438,40 @@ export default function Sidebar({
 
   return (
     <>
-      <aside className="w-60 shrink-0 flex flex-col h-screen bg-[var(--ts-bg-sidebar)] border-r border-gray-200 dark:border-zinc-800 overflow-hidden">
-      {/* ヘッダー */}
-      <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-200/80 dark:border-zinc-800/80">
-        <span className="flex items-center gap-1.5 font-semibold text-gray-700 dark:text-zinc-200 text-sm select-none">
-          <AppIcon />
-          ThinkSpeed
-        </span>
-        <div className="flex items-center gap-0.5">
+      <aside className={`${isCollapsed ? 'w-12' : 'w-60'} shrink-0 flex flex-col h-screen bg-[var(--ts-bg-sidebar)] border-r border-gray-200 dark:border-zinc-800 overflow-hidden transition-[width] duration-200`}>
+        {/* ヘッダー */}
+        <div className={`flex items-center border-b border-gray-200/80 dark:border-zinc-800/80 ${isCollapsed ? 'justify-center px-2 py-3.5' : 'justify-between px-4 py-3.5'}`}>
+          {isCollapsed ? (
+            <button
+              onClick={() => setIsCollapsed(false)}
+              title="サイドバーを展開"
+              aria-label="サイドバーを展開"
+              className="p-1 rounded text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:text-zinc-500 dark:hover:text-indigo-400 dark:hover:bg-indigo-950/50 transition-colors"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5 min-w-0">
+                {/* サイドバー折りたたみボタン */}
+                <button
+                  onClick={() => setIsCollapsed(true)}
+                  title="サイドバーを折りたたむ"
+                  aria-label="サイドバーを折りたたむ"
+                  className="p-1 rounded text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:text-zinc-500 dark:hover:text-indigo-400 dark:hover:bg-indigo-950/50 transition-colors"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                </button>
+                <span className="flex items-center gap-1.5 font-semibold text-gray-700 dark:text-zinc-200 text-sm select-none min-w-0">
+                  <AppIcon />
+                  <span className="truncate">ThinkSpeed</span>
+                </span>
+              </div>
+              <div className="flex items-center gap-0.5">
           {/* テーマ切替ボタン */}
           <button
             onClick={onToggleTheme}
@@ -1473,9 +1511,13 @@ export default function Sidebar({
               <line x1="9" y1="14" x2="15" y2="14" />
             </svg>
           </button>
+              </div>
+            </>
+          )}
         </div>
-      </div>
 
+        {!isCollapsed && (
+        <>
       {/* フォルダ・ファイルツリー */}
       <div className="flex-1 min-h-0 overflow-y-auto py-2">
         {folders.map(folder => {
@@ -1782,6 +1824,8 @@ export default function Sidebar({
           </svg>
         </button>
       </div>
+      </>
+      )}
     </aside>
     {showCalendar && (
       <CalendarOverlay
